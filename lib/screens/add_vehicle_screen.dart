@@ -1,0 +1,706 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../models/gps_provider.dart';
+import '../models/provider_credentials.dart';
+import '../models/saved_vehicle.dart';
+import '../providers/storage_provider.dart';
+import '../services/providers/gps_provider_client.dart';
+import '../services/providers/provider_client_factory.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_widgets.dart';
+
+/// Adds a vehicle in three clear steps: 1) pick a provider, 2) enter
+/// that provider's credentials, 3) test the connection, then save.
+/// The secret is stored only in secure storage. Save unlocks only
+/// after a successful test — that rule is unchanged.
+///
+/// The wizard step, the test state and the form are local, ephemeral
+/// screen state — plain setState. Only the save goes through a
+/// provider (the storage provider).
+class AddVehicleScreen extends ConsumerStatefulWidget {
+  const AddVehicleScreen({super.key});
+
+  @override
+  ConsumerState<AddVehicleScreen> createState() => _AddVehicleScreenState();
+}
+
+enum _TestState { idle, testing, success, error }
+
+class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _deviceIdController = TextEditingController();
+  final _secretController = TextEditingController();
+  final _regNoController = TextEditingController();
+  final _displayNameController = TextEditingController();
+
+  int _step = 0;
+  GpsProvider _provider = GpsProvider.aargee;
+  bool _secretVisible = false;
+  bool _testedOk = false;
+  bool _saving = false;
+  _TestState _testState = _TestState.idle;
+  String? _testMessage;
+  int _testCount = 0;
+
+  @override
+  void dispose() {
+    _deviceIdController.dispose();
+    _secretController.dispose();
+    _regNoController.dispose();
+    _displayNameController.dispose();
+    super.dispose();
+  }
+
+  ProviderCredentials get _credentials => ProviderCredentials(
+    deviceId: _deviceIdController.text.trim(),
+    secret: _secretController.text.trim(),
+    regNo: _regNoController.text.trim().isEmpty
+        ? null
+        : _regNoController.text.trim(),
+    displayName: _displayNameController.text.trim().isEmpty
+        ? null
+        : _displayNameController.text.trim(),
+  );
+
+  void _resetTest() {
+    setState(() {
+      _testedOk = false;
+      _testState = _TestState.idle;
+      _testMessage = null;
+      _testCount = 0;
+    });
+  }
+
+  void _selectProvider(GpsProvider provider) {
+    setState(() {
+      _provider = provider;
+      _testedOk = false;
+      _testState = _TestState.idle;
+      _testMessage = null;
+      _testCount = 0;
+    });
+  }
+
+  void _goToStep(int step) => setState(() => _step = step);
+
+  void _continueFromDetails() {
+    final form = _formKey.currentState;
+    if (form != null && !form.validate()) return;
+    _goToStep(2);
+  }
+
+  Future<void> _testConnection() async {
+    setState(() {
+      _testState = _TestState.testing;
+      _testedOk = false;
+      _testMessage = null;
+    });
+    try {
+      final client = clientFor(_provider);
+      final vehicles = await client.fetchLiveVehicles(_credentials);
+      if (!mounted) return;
+      if (vehicles.isEmpty) {
+        setState(() {
+          _testState = _TestState.error;
+          _testMessage =
+              'Connected, but the account returned no '
+              'vehicles. Check the device ID — it must match a vehicle '
+              'registered under this account.';
+        });
+        return;
+      }
+      setState(() {
+        _testState = _TestState.success;
+        _testCount = vehicles.length;
+        _testedOk = true;
+      });
+    } on ProviderException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _testState = _TestState.error;
+        _testMessage = e.message;
+      });
+    } on UnsupportedError catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _testState = _TestState.error;
+        _testMessage = e.message ?? 'Not supported yet.';
+      });
+    }
+  }
+
+  Future<void> _save() async {
+    if (!_testedOk) return;
+    setState(() => _saving = true);
+    try {
+      final vehicle = SavedVehicle(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        providerKey: _provider.key,
+        deviceId: _deviceIdController.text.trim(),
+        regNo: _regNoController.text.trim().isEmpty
+            ? null
+            : _regNoController.text.trim(),
+        displayName: _displayNameController.text.trim().isEmpty
+            ? null
+            : _displayNameController.text.trim(),
+      );
+      await ref
+          .read(secureStorageServiceProvider)
+          .saveVehicle(vehicle, _secretController.text.trim());
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  String _authDescription(AuthType type) {
+    switch (type) {
+      case AuthType.apiKey:
+        return 'Signs in with one API key';
+      case AuthType.userIdAndKey:
+        return 'Signs in with a user ID + key';
+      case AuthType.usernamePassword:
+        return 'Signs in with username + password';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: _step == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _step > 0) _goToStep(_step - 1);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: _step == 0 ? 'Back' : 'Previous step',
+            onPressed: () {
+              if (_step > 0) {
+                _goToStep(_step - 1);
+              } else {
+                Navigator.of(context).pop();
+              }
+            },
+          ),
+          title: const Text('Add vehicle'),
+        ),
+        body: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              StepIndicator(
+                currentStep: _step,
+                labels: const ['Provider', 'Details', 'Test & save'],
+              ),
+              const SizedBox(height: 20),
+              if (_step == 0) _buildProviderStep(),
+              if (_step == 1) _buildDetailsStep(),
+              if (_step == 2) _buildTestStep(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProviderStep() {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Which GPS provider is this vehicle on?',
+          style: theme.textTheme.titleLarge,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Each provider has its own API. Pick the one the vehicle\'s '
+          'tracker is registered with.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...GpsProvider.values.map((provider) {
+          final selected = provider == _provider;
+          final color = AppColors.providerColor(provider.key);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+                side: BorderSide(
+                  color: selected ? color : Colors.transparent,
+                  width: 2.5,
+                ),
+              ),
+              child: InkWell(
+                onTap: () => _selectProvider(provider),
+                borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(
+                          Icons.satellite_alt_outlined,
+                          color: color,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    provider.displayName,
+                                    style: theme.textTheme.titleMedium,
+                                  ),
+                                ),
+                                ProviderStatusPill(provider: provider),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _authDescription(provider.authType),
+                              style: theme.textTheme.bodySmall,
+                            ),
+                            if (provider.supportsHistory)
+                              Text(
+                                'Live tracking + history',
+                                style: theme.textTheme.bodySmall,
+                              )
+                            else
+                              Text(
+                                'Live tracking only (no history)',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        selected
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        color: selected
+                            ? color
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: () => _goToStep(1),
+            child: const Text('Continue'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailsStep() {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Enter ${_provider.displayName} credentials',
+          style: theme.textTheme.titleLarge,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'These stay only on this device, in secure storage.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (!_provider.verified)
+          Card(
+            color: AppColors.idle.withValues(alpha: 0.12),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.construction_outlined,
+                    color: AppColors.idle,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${_provider.displayName} is not verified yet — '
+                      'its endpoint paths are not confirmed. Test '
+                      'connection will explain what is missing.',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          Text(_provider.rateLimitNote, style: theme.textTheme.bodySmall),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _deviceIdController,
+          decoration: InputDecoration(
+            labelText: _provider.deviceIdLabel,
+            hintText: _provider.deviceIdHint,
+            helperText: 'This identifies the vehicle at the provider.',
+          ),
+          validator: (value) =>
+              value == null || value.trim().isEmpty ? 'Required' : null,
+          onChanged: (_) {
+            if (_testedOk) _resetTest();
+          },
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _secretController,
+          obscureText: !_secretVisible,
+          decoration: InputDecoration(
+            labelText: _provider.secretLabel,
+            hintText: _provider.secretHint,
+            helperText: 'Never shared — stored only on this device.',
+            suffixIcon: IconButton(
+              icon: Icon(
+                _secretVisible
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
+              tooltip: _secretVisible ? 'Hide' : 'Show',
+              onPressed: () => setState(() => _secretVisible = !_secretVisible),
+            ),
+          ),
+          validator: (value) =>
+              value == null || value.trim().isEmpty ? 'Required' : null,
+          onChanged: (_) {
+            if (_testedOk) _resetTest();
+          },
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _regNoController,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(
+            labelText: 'Registration number (optional)',
+            hintText: 'Used for display and fallback matching',
+          ),
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _displayNameController,
+          decoration: const InputDecoration(
+            labelText: 'Display name (optional)',
+            hintText: 'Friendly name for the fleet list',
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => _goToStep(0),
+                child: const Text('Back'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: FilledButton(
+                onPressed: _continueFromDetails,
+                child: const Text('Continue'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTestStep() {
+    final theme = Theme.of(context);
+    final deviceId = _deviceIdController.text.trim();
+    final regNo = _regNoController.text.trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Test the connection', style: theme.textTheme.titleLarge),
+        const SizedBox(height: 6),
+        Text(
+          'We\'ll contact ${_provider.displayName} with these credentials '
+          'before saving anything.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    ProviderBadge(providerKey: _provider.key),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _provider.displayName,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Icon(Icons.tag_outlined, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(deviceId, style: theme.textTheme.bodyMedium),
+                    ),
+                  ],
+                ),
+                if (regNo.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.directions_car_outlined, size: 18),
+                      const SizedBox(width: 8),
+                      Text(regNo, style: theme.textTheme.bodyMedium),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (_testState == _TestState.idle)
+          Card(
+            color: theme.colorScheme.primary.withValues(alpha: 0.08),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.wifi_tethering_outlined,
+                    color: theme.colorScheme.primary,
+                    size: 26,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Tap "Test connection" — if the provider answers '
+                      'with your vehicle, Save unlocks.',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (_testState == _TestState.testing)
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 3),
+                  ),
+                  SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      'Contacting the provider…',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (_testState == _TestState.success)
+          Card(
+            color: AppColors.live.withValues(alpha: 0.12),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: const BoxDecoration(
+                      color: AppColors.live,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Connected!',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: AppColors.live,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$_testCount vehicle${_testCount == 1 ? '' : 's'} '
+                          'found on ${_provider.displayName}.',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (_testState == _TestState.error)
+          Card(
+            color: AppColors.expired.withValues(alpha: 0.1),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: AppColors.expired,
+                        size: 26,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Connection failed',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: AppColors.expired,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _testMessage ?? 'Unknown error.',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text('What to check:', style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  const Text('• The API key / password is copied correctly'),
+                  const Text('• The device ID matches the provider account'),
+                  const Text('• The vehicle is registered under this account'),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _testState == _TestState.testing
+                ? null
+                : _testConnection,
+            icon: const Icon(Icons.wifi_tethering_outlined),
+            label: Text(
+              _testState == _TestState.testing
+                  ? 'Testing…'
+                  : _testState == _TestState.error
+                  ? 'Test again'
+                  : 'Test connection',
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _testedOk && !_saving ? _save : null,
+            icon: const Icon(Icons.save_outlined),
+            label: Text(_saving ? 'Saving…' : 'Save vehicle'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.live,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
+        if (!_testedOk)
+          const Padding(
+            padding: EdgeInsets.only(top: 10),
+            child: Text(
+              'Test the connection first — Save unlocks after a '
+              'successful test.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => _goToStep(1),
+                child: const Text('Back'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Credentials are stored only on this device, in secure '
+          'storage. They are never uploaded anywhere except the '
+          'provider\'s own API.',
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
