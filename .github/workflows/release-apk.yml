@@ -20,7 +20,7 @@ jobs:
           channel: 'stable'
 
       - name: Decode keystore
-        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/unitrack-release.jks
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/unitrack-release.jks
 
       - name: Create key.properties
         run: |
