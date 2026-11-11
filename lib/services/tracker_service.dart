@@ -124,6 +124,13 @@ class TrackerService {
       errors.add('${provider.displayName}: ${e.message}');
     } on UnsupportedError catch (e) {
       errors.add('${provider.displayName}: ${e.message}');
+    } on TimeoutException {
+      // A slow account used to abort the whole refresh (and leave the
+      // fleet list stale); now it is just one error line and the next
+      // refresh retries it.
+      errors.add('${provider.displayName}: timed out — will retry next refresh.');
+    } catch (e) {
+      errors.add('${provider.displayName}: $e');
     }
   }
 

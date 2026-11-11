@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -126,6 +129,42 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
       setState(() {
         _testState = _TestState.error;
         _testMessage = e.message ?? 'Not supported yet.';
+      });
+    } on TimeoutException {
+      // The provider clients give up after 20s (30s for Aargee); on a
+      // slow mobile connection that can fire even when the key is
+      // right. This used to be uncaught, leaving the screen stuck on
+      // the spinner forever with no error and no retry.
+      if (!mounted) return;
+      setState(() {
+        _testState = _TestState.error;
+        _testMessage =
+            'The provider took too long to answer. Check your internet '
+            'connection and tap Test again.';
+      });
+    } on IOException {
+      // Covers SocketException and ClientException (no route to host,
+      // DNS failure, connection refused, ...).
+      if (!mounted) return;
+      setState(() {
+        _testState = _TestState.error;
+        _testMessage =
+            'Could not reach ${_provider.displayName} — check your '
+            'internet connection and try again.';
+      });
+    } on FormatException {
+      if (!mounted) return;
+      setState(() {
+        _testState = _TestState.error;
+        _testMessage =
+            'The provider returned an unexpected response. Try again, '
+            'or check the API key.';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _testState = _TestState.error;
+        _testMessage = 'Connection failed: $e';
       });
     }
   }

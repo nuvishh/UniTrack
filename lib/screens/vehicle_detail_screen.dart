@@ -53,6 +53,10 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
     } on ProviderException catch (e) {
       if (!mounted) return;
       setState(() => _historyError = e.message);
+    } catch (e) {
+      // Timeout / network errors used to be unhandled here.
+      if (!mounted) return;
+      setState(() => _historyError = 'Could not load history: $e');
     } finally {
       if (mounted) setState(() => _loadingHistory = false);
     }

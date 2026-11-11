@@ -69,7 +69,9 @@ class AargeeClient extends GpsProviderClient {
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(body),
         )
-        .timeout(const Duration(seconds: 20));
+        // Aargee's server is slow: 10.6s observed 2026-11-11 for a
+        // last-data call, so 20s leaves little headroom on mobile data.
+        .timeout(const Duration(seconds: 30));
     if (response.statusCode != 200) {
       throw ProviderException('Aargee returned HTTP ${response.statusCode}.');
     }
