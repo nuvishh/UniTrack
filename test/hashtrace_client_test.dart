@@ -1,5 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:unitrack/models/provider_credentials.dart';
 import 'package:unitrack/models/vehicle.dart';
+import 'package:unitrack/services/providers/gps_provider_client.dart';
 import 'package:unitrack/services/providers/hashtrace_client.dart';
 
 // All values below are FAKE examples — never real reg numbers, IMEIs,
@@ -88,6 +92,79 @@ void main() {
       expect(
         HashTraceClient.isExpiredSentinel({'VId': 10001, 'VName': 'BUS 01'}),
         isFalse,
+      );
+    });
+  });
+
+  group('HashTraceClient.fetchLiveVehicles device-id routing', () {
+    const listBody = '''
+[
+  {"VId": 10001, "VName": "BUS 01", "Imei": "860000000000001",
+   "VPlate": "KL00XX0000", "TTime": "2026-11-09T16:01:46",
+   "Lat": "12.5383540", "Lon": "75.0022600", "Ign": true, "Spd": 0,
+   "Dir": 0.0, "MVolt": 12.5, "Batt": 4.1},
+  {"VId": 10002, "VName": "BUS 02", "Imei": "860000000000002",
+   "VPlate": "KL00XX0001", "TTime": "2026-11-09T15:58:10",
+   "Lat": "12.5400000", "Lon": "75.0030000", "Ign": false, "Spd": 0,
+   "Dir": 90.0, "MVolt": 12.4, "Batt": 4.0}
+]
+''';
+    const singleBody = '''
+{"VId": 10001, "VName": "BUS 01", "Imei": "860000000000001",
+ "VPlate": "KL00XX0000", "TTime": "2026-11-09T16:01:46",
+ "Lat": "12.5383540", "Lon": "75.0022600", "Ign": true, "Spd": 0,
+ "Dir": 0.0, "MVolt": 12.5, "Batt": 4.1}
+''';
+
+    test('a 15-digit IMEI is matched via /All, never sent as vehicleId',
+        () async {
+      final requested = <Uri>[];
+      final mock = MockClient((request) async {
+        requested.add(request.url);
+        return http.Response(listBody, 200);
+      });
+      final vehicles = await HashTraceClient().fetchLiveVehicles(
+        const ProviderCredentials(
+          deviceId: '860000000000002',
+          secret: 'fake-key',
+        ),
+        httpClient: mock,
+      );
+      expect(requested, hasLength(1));
+      expect(requested[0].path, contains('/All'));
+      expect(vehicles, hasLength(1));
+      expect(vehicles[0].id, '10002');
+      expect(vehicles[0].imei, '860000000000002');
+    });
+
+    test('a short numeric VId is fetched directly via /Vehicle', () async {
+      final requested = <Uri>[];
+      final mock = MockClient((request) async {
+        requested.add(request.url);
+        return http.Response(singleBody, 200);
+      });
+      final vehicles = await HashTraceClient().fetchLiveVehicles(
+        const ProviderCredentials(deviceId: '10001', secret: 'fake-key'),
+        httpClient: mock,
+      );
+      expect(requested, hasLength(1));
+      expect(requested[0].path, contains('/Vehicle'));
+      expect(requested[0].queryParameters['vehicleId'], '10001');
+      expect(vehicles, hasLength(1));
+      expect(vehicles[0].id, '10001');
+    });
+
+    test('an unknown device ID throws a clear error', () async {
+      final mock = MockClient((_) async => http.Response(listBody, 200));
+      expect(
+        () => HashTraceClient().fetchLiveVehicles(
+          const ProviderCredentials(
+            deviceId: '869999999999999',
+            secret: 'fake-key',
+          ),
+          httpClient: mock,
+        ),
+        throwsA(isA<ProviderException>()),
       );
     });
   });

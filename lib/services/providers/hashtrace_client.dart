@@ -47,9 +47,14 @@ class HashTraceClient extends GpsProviderClient {
   }) async {
     final client = httpClient ?? http.Client();
     try {
-      // A numeric device id is a VId — fetch that vehicle directly.
-      final vehicleId = int.tryParse(credentials.deviceId.trim());
-      if (vehicleId != null) {
+      final deviceId = credentials.deviceId.trim();
+      // A 15-digit IMEI is numeric too — only short numbers are VIds.
+      // Sending an IMEI as vehicleId makes the API return the
+      // "_Expired" sentinel, so the test failed even with a correct
+      // key (reported 2026-11-11: Pingman worked, the app did not).
+      // Long numeric ids go to /All and are matched by IMEI below.
+      final vehicleId = int.tryParse(deviceId);
+      if (vehicleId != null && deviceId.length <= 8) {
         final vehicle = await fetchVehicle(
           credentials.secret,
           vehicleId,
@@ -74,7 +79,23 @@ class HashTraceClient extends GpsProviderClient {
           'HashTrace returned HTTP ${response.statusCode}.',
         );
       }
-      return parseVehicleList(response.body);
+      final vehicles = parseVehicleList(response.body);
+      if (deviceId.isEmpty) return vehicles;
+      // Match the requested vehicle by VId, IMEI or plate — so the
+      // test proves THAT vehicle exists, not just that the key works.
+      final match = vehicles
+          .where((v) =>
+              v.id == deviceId ||
+              v.imei == deviceId ||
+              v.displayName == deviceId)
+          .toList();
+      if (match.isEmpty) {
+        throw ProviderException(
+          'HashTrace found no vehicle with ID "$deviceId" — check the '
+          'vehicle ID (numeric VId or 15-digit IMEI).',
+        );
+      }
+      return match;
     } finally {
       if (httpClient == null) client.close();
     }
