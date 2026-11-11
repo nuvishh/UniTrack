@@ -65,15 +65,15 @@ void main() {
 
     test('verified flags match the live checks', () {
       // Verified live 2026-11-09: LiveTrace, SimplyTrack, HashTrace,
-      // Aargee. Verified live 2026-11-11: MercyDataTrack, PauldeaTrack.
-      // Only Transight is still guide-only.
+      // Aargee. Verified live 2026-11-11: MercyDataTrack, PauldeaTrack,
+      // Transight. All 7 providers are now live-verified.
       expect(GpsProvider.radiant.verified, isTrue);
       expect(GpsProvider.voltysoft.verified, isTrue);
       expect(GpsProvider.hashtrace.verified, isTrue);
       expect(GpsProvider.aargee.verified, isTrue);
       expect(GpsProvider.mercydatrack.verified, isTrue);
       expect(GpsProvider.pauldeatrack.verified, isTrue);
-      expect(GpsProvider.transight.verified, isFalse);
+      expect(GpsProvider.transight.verified, isTrue);
     });
   });
 

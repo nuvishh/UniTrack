@@ -17,10 +17,8 @@ enum AuthType {
 ///
 /// [verified] marks the providers whose API contract was tested live
 /// against the real API (2026-11-09 for LiveTrace, SimplyTrack,
-/// HashTrace and Aargee; 2026-11-11 for MercyDataTrack and
-/// PauldeaTrack). Transight is still implemented from the guide only —
-/// its client is a skeleton with an explicit TODO until its endpoint
-/// paths are confirmed.
+/// HashTrace and Aargee; 2026-11-11 for MercyDataTrack, PauldeaTrack
+/// and Transight). All 7 providers are now live-verified.
 enum GpsProvider {
   transight(
     key: 'transight',
@@ -31,9 +29,10 @@ enum GpsProvider {
     secretLabel: 'API Key',
     secretHint: '36-character Transight API key',
     supportsHistory: true,
-    verified: false,
+    verified: true,
     minPollInterval: Duration(seconds: 60),
-    rateLimitNote: 'Rate limit not documented in the guide.',
+    rateLimitNote:
+        'Last-data 500/day; vehicle list 100/day; history 10/day/vehicle.',
   ),
   aargee(
     key: 'aargee',
