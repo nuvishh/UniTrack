@@ -32,11 +32,17 @@ void main() {
     });
 
     test('only live-snapshot providers lack history support', () {
+      // Live snapshots only: HashTrace, LiveTrace, MercyDataTrack and
+      // PauldeaTrack (no history endpoint verified for the last two).
       expect(GpsProvider.hashtrace.supportsHistory, isFalse);
       expect(GpsProvider.radiant.supportsHistory, isFalse);
+      expect(GpsProvider.mercydatrack.supportsHistory, isFalse);
+      expect(GpsProvider.pauldeatrack.supportsHistory, isFalse);
       for (final provider in GpsProvider.values) {
         if (provider != GpsProvider.hashtrace &&
-            provider != GpsProvider.radiant) {
+            provider != GpsProvider.radiant &&
+            provider != GpsProvider.mercydatrack &&
+            provider != GpsProvider.pauldeatrack) {
           expect(
             provider.supportsHistory,
             isTrue,
@@ -57,14 +63,17 @@ void main() {
       );
     });
 
-    test('verified flags match the 2026-11-09 live checks', () {
+    test('verified flags match the live checks', () {
+      // Verified live 2026-11-09: LiveTrace, SimplyTrack, HashTrace,
+      // Aargee. Verified live 2026-11-11: MercyDataTrack, PauldeaTrack.
+      // Only Transight is still guide-only.
       expect(GpsProvider.radiant.verified, isTrue);
       expect(GpsProvider.voltysoft.verified, isTrue);
       expect(GpsProvider.hashtrace.verified, isTrue);
       expect(GpsProvider.aargee.verified, isTrue);
+      expect(GpsProvider.mercydatrack.verified, isTrue);
+      expect(GpsProvider.pauldeatrack.verified, isTrue);
       expect(GpsProvider.transight.verified, isFalse);
-      expect(GpsProvider.mercydatrack.verified, isFalse);
-      expect(GpsProvider.pauldeatrack.verified, isFalse);
     });
   });
 

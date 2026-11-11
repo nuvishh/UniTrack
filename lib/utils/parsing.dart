@@ -42,6 +42,32 @@ DateTime? parseDateTime(dynamic value) {
   return null;
 }
 
+/// Parses a "dd-MM-yyyy hh:mm:ss AM/PM" timestamp — the `source_date`
+/// format of MercyDataTrack and PauldeaTrack, e.g.
+/// "11-11-2026 03:34:32 PM". Returns null when the value is missing or
+/// unparseable. Like the other providers' times, it carries no timezone
+/// marker, so it is parsed as local time.
+DateTime? parseDayMonthYearTime(dynamic value) {
+  if (value is! String) return null;
+  final match = RegExp(
+    r'^(\d{2})-(\d{2})-(\d{4}) (\d{1,2}):(\d{2}):(\d{2})\s*([AP]M)$',
+  ).firstMatch(value.trim().toUpperCase());
+  if (match == null) return null;
+  var hour = int.parse(match.group(4)!);
+  final minute = int.parse(match.group(5)!);
+  final second = int.parse(match.group(6)!);
+  if (match.group(7) == 'PM' && hour < 12) hour += 12;
+  if (match.group(7) == 'AM' && hour == 12) hour = 0;
+  return DateTime(
+    int.parse(match.group(3)!),
+    int.parse(match.group(2)!),
+    int.parse(match.group(1)!),
+    hour,
+    minute,
+    second,
+  );
+}
+
 /// Normalises a registration number for comparison: strips spaces and
 /// dashes and upper-cases it, so "KL 00 XX 0000" matches "KL00XX0000".
 String normalizeRegNo(String input) =>

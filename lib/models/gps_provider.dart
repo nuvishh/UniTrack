@@ -16,9 +16,11 @@ enum AuthType {
 /// integration guide (GPS_INTEGRATION_GUIDE.md).
 ///
 /// [verified] marks the providers whose API contract was tested live
-/// against the real API on 2026-11-09. The others are implemented from the
-/// guide only — their clients are skeletons with explicit TODOs until
-/// their endpoint paths are confirmed.
+/// against the real API (2026-11-09 for LiveTrace, SimplyTrack,
+/// HashTrace and Aargee; 2026-11-11 for MercyDataTrack and
+/// PauldeaTrack). Transight is still implemented from the guide only —
+/// its client is a skeleton with an explicit TODO until its endpoint
+/// paths are confirmed.
 enum GpsProvider {
   transight(
     key: 'transight',
@@ -64,12 +66,12 @@ enum GpsProvider {
     key: 'mercydatrack',
     displayName: 'MercyDataTrack',
     authType: AuthType.usernamePassword,
-    deviceIdLabel: 'Username',
-    deviceIdHint: 'MercyDataTrack account username',
-    secretLabel: 'Account Password',
-    secretHint: 'MercyDataTrack account password',
-    supportsHistory: true,
-    verified: false,
+    deviceIdLabel: 'Vehicle Registration',
+    deviceIdHint: 'Registration number, e.g. KL00XX0000',
+    secretLabel: 'Username : Password',
+    secretHint: 'username:password',
+    supportsHistory: false,
+    verified: true,
     minPollInterval: Duration(seconds: 60),
     rateLimitNote: 'Rate limit not documented in the guide.',
   ),
@@ -77,12 +79,12 @@ enum GpsProvider {
     key: 'pauldeatrack',
     displayName: 'PauldeaTrack',
     authType: AuthType.usernamePassword,
-    deviceIdLabel: 'Username',
-    deviceIdHint: 'PauldeaTrack account username',
-    secretLabel: 'Account Password',
-    secretHint: 'PauldeaTrack account password',
-    supportsHistory: true,
-    verified: false,
+    deviceIdLabel: 'Vehicle Registration',
+    deviceIdHint: 'Registration number, e.g. KL00XX0000',
+    secretLabel: 'Username : Password',
+    secretHint: 'username:password',
+    supportsHistory: false,
+    verified: true,
     minPollInterval: Duration(seconds: 60),
     rateLimitNote: 'Rate limit not documented in the guide.',
   ),

@@ -1,40 +1,141 @@
+import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
 import '../../models/gps_provider.dart';
 import '../../models/provider_credentials.dart';
 import '../../models/vehicle.dart';
+import '../../utils/parsing.dart';
 import 'gps_provider_client.dart';
 
-/// PauldeaTrack client — GUIDE-ONLY, NOT live-verified.
+/// PauldeaTrack client.
 ///
-/// Same pattern as MercyDataTrack: the GPS guide gives the console API
-/// base URL https://console.pauldeatrack.com/ptrack/ and the auth pattern
-/// (account username in `gps_device_id`, account password in
-/// `gps_password`, vehicle matched by exact registration number in
-/// `vehicle_no`) — but NO endpoint paths. This client is a skeleton.
+/// VERIFIED LIVE 2026-11-11 (from the user's phone — the VM route to
+/// the console host returns empty replies, but the mobiles host works
+/// from the VM too).
+/// - Base: https://mobiles.pauldeatrack.com/ptrack
+///   (the console host https://console.pauldeatrack.com/ptrack serves
+///   the same endpoint but did not answer from the VM on 2026-11-11,
+///   so the mobiles host is the one to use.)
+/// - GET /vehicle-live-data?username=...&password=...&vehicle_registration=...
+///   → {"status":"success","code":200,"data":{...}} — one vehicle object.
+/// - Data fields: vehicle_registration, imei_no, latitude, longitude,
+///   ignition ("ON"/"OFF"), speed, serial_no, source_date
+///   ("dd-MM-yyyy hh:mm:ss AM/PM", no timezone).
+/// - The vehicle_registration parameter selects one vehicle when the
+///   account has several; the response carries that one vehicle only.
 ///
-/// TODO: confirm the endpoint paths against the PauldeaTrack console API
-/// docs (the CampusMan backend calls a `vehicle-data` operation for
-/// history), then implement fetchLiveVehicles/fetchHistory and set
-/// `GpsProvider.pauldeatrack.verified` to true.
+/// Credentials in UniTrack: deviceId = vehicle registration number,
+/// secret = "username:password".
 class PauldeaTrackClient extends GpsProviderClient {
   @override
   GpsProvider get provider => GpsProvider.pauldeatrack;
 
-  static const _base = 'https://console.pauldeatrack.com/ptrack';
+  static const _base = 'https://mobiles.pauldeatrack.com/ptrack';
 
-  /// Base URL from the GPS guide (endpoint paths still to confirm).
+  /// Base URL (live-verified 2026-11-11).
   static String get baseUrl => _base;
+
+  /// Splits a "username:password" secret at the first colon.
+  static ({String username, String password}) splitAuth(
+    ProviderCredentials credentials,
+  ) {
+    final secret = credentials.secret.trim();
+    final colon = secret.indexOf(':');
+    if (colon <= 0 || colon == secret.length - 1) {
+      throw ProviderException(
+        'PauldeaTrack needs the login as username:password — '
+        'put the account username, a colon, then the password in the '
+        'secret field.',
+      );
+    }
+    return (
+      username: secret.substring(0, colon),
+      password: secret.substring(colon + 1),
+    );
+  }
 
   @override
   Future<List<Vehicle>> fetchLiveVehicles(
     ProviderCredentials credentials, {
     http.Client? httpClient,
   }) async {
-    throw ProviderException(
-      'PauldeaTrack endpoint paths are not documented in the GPS guide '
-      '— only the base URL ($_base) is known. Confirm the paths against '
-      'the PauldeaTrack console API docs before enabling this provider.',
+    final client = httpClient ?? http.Client();
+    try {
+      final deviceId = credentials.deviceId.trim();
+      final auth = splitAuth(credentials);
+      final uri = Uri.parse(
+        '$_base/vehicle-live-data'
+        '?username=${Uri.encodeQueryComponent(auth.username)}'
+        '&password=${Uri.encodeQueryComponent(auth.password)}'
+        '&vehicle_registration=${Uri.encodeQueryComponent(deviceId)}',
+      );
+      final response = await client
+          .get(uri)
+          .timeout(const Duration(seconds: 20));
+      if (response.statusCode != 200) {
+        throw ProviderException(
+          'PauldeaTrack returned HTTP ${response.statusCode}.',
+        );
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw ProviderException(
+          'PauldeaTrack returned an unexpected response.',
+        );
+      }
+      if (decoded['status'] != 'success') {
+        throw ProviderException(
+          'PauldeaTrack reported an error — check the username, '
+          'password and vehicle registration.',
+        );
+      }
+      final data = decoded['data'];
+      if (data is! Map<String, dynamic>) {
+        throw ProviderException(
+          'PauldeaTrack returned no vehicle data — check the '
+          'vehicle registration.',
+        );
+      }
+      final vehicle = parseVehicle(data);
+      // The API selects by vehicle_registration, but verify the
+      // returned vehicle is the one asked for — the test must prove
+      // THAT vehicle exists, not just that the login works.
+      if (deviceId.isNotEmpty &&
+          normalizeRegNo(vehicle.displayName) != normalizeRegNo(deviceId)) {
+        throw ProviderException(
+          'PauldeaTrack found no vehicle with registration '
+          '"$deviceId" — check the vehicle registration number.',
+        );
+      }
+      return [vehicle];
+    } finally {
+      if (httpClient == null) client.close();
+    }
+  }
+
+  /// Parses one vehicle-live-data object. Public for tests.
+  static Vehicle parseVehicle(Map<String, dynamic> json) {
+    final reg = json['vehicle_registration']?.toString() ?? 'unknown';
+    final ignition = parseIgnition(json['ignition']);
+    final timeRaw = json['source_date']?.toString() ?? '';
+    return Vehicle(
+      id: reg,
+      displayName: reg,
+      providerKey: GpsProvider.pauldeatrack.key,
+      imei: json['imei_no']?.toString(),
+      latitude: parseCoord(json['latitude']),
+      longitude: parseCoord(json['longitude']),
+      speedKmph: parseSpeed(json['speed']),
+      ignition: ignition,
+      lastUpdatedRaw: timeRaw,
+      lastUpdated: parseDayMonthYearTime(timeRaw),
+      status: ignition == true
+          ? VehicleStatus.live
+          : ignition == false
+              ? VehicleStatus.idle
+              : VehicleStatus.unknown,
+      rawJson: json,
     );
   }
 }
