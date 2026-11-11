@@ -11,6 +11,7 @@ import '../services/providers/gps_provider_client.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
 import '../widgets/vehicle_status_chip.dart';
+import 'map_screen.dart';
 
 /// Detail for one vehicle: a big live status hero, the key facts, and
 /// today's route where the provider supports history.
@@ -25,6 +26,88 @@ class VehicleDetailScreen extends ConsumerStatefulWidget {
   @override
   ConsumerState<VehicleDetailScreen> createState() =>
       _VehicleDetailScreenState();
+}
+
+/// Compact live-location map under the status hero: the vehicle's
+/// current position on OpenStreetMap. The map itself is a static
+/// preview (it never steals the page scroll); tap anywhere on the
+/// card to open the full map.
+class _LiveLocationMap extends StatelessWidget {
+  const _LiveLocationMap({required this.vehicle});
+
+  final Vehicle vehicle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final point = LatLng(vehicle.latitude!, vehicle.longitude!);
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const MapScreen()),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 200,
+              child: IgnorePointer(
+                child: FlutterMap(
+                  options: MapOptions(
+                    initialCenter: point,
+                    initialZoom: 14,
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.nuvish.unitrack',
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: point,
+                          width: 48,
+                          height: 48,
+                          child: Icon(
+                            Icons.location_on,
+                            color: AppColors.statusColor(vehicle.status),
+                            size: 44,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  const Icon(Icons.map_outlined, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Live location — tap for the full map',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
@@ -137,7 +220,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
                   color: statusColor.withValues(alpha: 0.35),
@@ -233,6 +316,11 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          // Live location preview — tap for the full map.
+          if (vehicle.hasFix) ...[
+            _LiveLocationMap(vehicle: vehicle),
+            const SizedBox(height: 16),
+          ],
           // Facts.
           Card(
             child: Padding(

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'providers/theme_provider.dart';
-import 'screens/fleet_list_screen.dart';
+import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
 
 /// UniTrack — one app to track vehicles from different GPS providers,
@@ -28,7 +28,7 @@ class UniTrackApp extends ConsumerWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
-      home: const FleetListScreen(),
+      home: const HomeScreen(),
     );
   }
 }

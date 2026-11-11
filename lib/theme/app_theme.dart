@@ -8,6 +8,10 @@ import '../models/vehicle.dart';
 /// spacing and expressive rounded cards. Deliberately NOT a flat minimal
 /// grey look: the fleet status must read at a glance from across the
 /// room, and the primary actions must feel big and tappable.
+///
+/// Modern refresh (2026-11-11): softer tonal cards with a hairline
+/// outline instead of hard shadows, larger radii, and a thumb-reachable
+/// bottom navigation bar as the app's main navigation.
 class AppColors {
   // Brand.
   static const Color primary = Color(0xFF2547F4); // vivid royal blue
@@ -31,7 +35,7 @@ class AppColors {
   // Dark theme surfaces — deep navy, not plain black.
   static const Color darkBackground = Color(0xFF0C0F24);
   static const Color darkSurface = Color(0xFF181C38);
-  static const Color darkSurfaceRaised = Color(0xFF232845);
+  static const Color darkSurfaceRaised = Color(0xFF20264A);
   static const Color darkInk = Color(0xFFF2F3FA);
   static const Color darkMuted = Color(0xFFA7ABC2);
 
@@ -75,9 +79,9 @@ class AppColors {
 /// The two UniTrack themes (light + dark). Everything screens build with
 /// comes from here — no hard-coded colours or text styles in screens.
 class AppTheme {
-  static const double cardRadius = 18;
-  static const double fieldRadius = 14;
-  static const double buttonRadius = 14;
+  static const double cardRadius = 20;
+  static const double fieldRadius = 16;
+  static const double buttonRadius = 16;
 
   static ThemeData get light => _build(Brightness.light);
   static ThemeData get dark => _build(Brightness.dark);
@@ -189,10 +193,15 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: surface,
-        elevation: 2,
-        shadowColor: Colors.black.withValues(alpha: 0.12),
+        elevation: 1,
+        shadowColor: Colors.black.withValues(alpha: 0.08),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(cardRadius),
+          side: BorderSide(
+            color: (isDark ? Colors.white : Colors.black).withValues(
+              alpha: 0.06,
+            ),
+          ),
         ),
         margin: EdgeInsets.zero,
       ),
@@ -271,6 +280,29 @@ class AppTheme {
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         elevation: 8,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: surface,
+        elevation: 2,
+        shadowColor: Colors.black.withValues(alpha: 0.1),
+        indicatorColor: primary.withValues(alpha: 0.14),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            size: 26,
+            color: states.contains(WidgetState.selected)
+                ? primary
+                : muted,
+          ),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: states.contains(WidgetState.selected)
+                ? primary
+                : muted,
+          ),
+        ),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,

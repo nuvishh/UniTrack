@@ -11,8 +11,6 @@ import '../utils/time_format.dart';
 import '../widgets/app_widgets.dart';
 import '../widgets/vehicle_status_chip.dart';
 import 'add_vehicle_screen.dart';
-import 'map_screen.dart';
-import 'settings_screen.dart';
 import 'vehicle_detail_screen.dart';
 
 /// Home screen: every vehicle from every provider, with a live summary,
@@ -34,6 +32,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedProviderKey = 'all';
+  Set<VehicleStatus>? _selectedStatuses;
   DateTime? _lastRefreshed;
   bool _wasRefreshing = false;
   Timer? _labelTimer;
@@ -72,16 +71,6 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
     await _refresh();
   }
 
-  void _openMap() {
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const MapScreen()));
-  }
-
-  void _openSettings() {
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
-  }
-
   void _openDetail(Vehicle vehicle) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => VehicleDetailScreen(vehicle: vehicle)),
@@ -92,6 +81,9 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
     var list = vehicles;
     if (_selectedProviderKey != 'all') {
       list = list.where((v) => v.providerKey == _selectedProviderKey).toList();
+    }
+    if (_selectedStatuses != null) {
+      list = list.where((v) => _selectedStatuses!.contains(v.status)).toList();
     }
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
@@ -148,14 +140,9 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.map_outlined),
-            tooltip: 'Map',
-            onPressed: _openMap,
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Settings',
-            onPressed: _openSettings,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh now',
+            onPressed: _refresh,
           ),
         ],
       ),
@@ -168,6 +155,14 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
             lastRefreshed: _lastRefreshed,
             isRefreshing: isRefreshing,
             onRefresh: _refresh,
+            selectedStatuses: _selectedStatuses,
+            onStatTap: (statuses) => setState(() {
+              final same =
+                  _selectedStatuses != null &&
+                  _selectedStatuses!.length == statuses.length &&
+                  _selectedStatuses!.containsAll(statuses);
+              _selectedStatuses = same ? null : statuses;
+            }),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -210,11 +205,6 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAddVehicle,
-        icon: const Icon(Icons.add),
-        label: const Text('Add vehicle'),
       ),
     );
   }
@@ -265,13 +255,14 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
         title: 'No matches',
         message:
             'Nothing in the fleet matches "$_searchQuery". '
-            'Try a different reg no or provider.',
+            'Try a different reg no, provider or status.',
         actionLabel: 'Clear search & filters',
         onAction: () {
           _searchController.clear();
           setState(() {
             _searchQuery = '';
             _selectedProviderKey = 'all';
+            _selectedStatuses = null;
           });
         },
       );
@@ -298,6 +289,9 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
 
 /// Bold gradient strip on top of the fleet: live / idle / offline
 /// counts at a glance, plus when the fleet was last refreshed.
+///
+/// The three counts are tappable: tap one to filter the list to that
+/// status, tap it again to clear the filter.
 class _SummaryStrip extends StatelessWidget {
   const _SummaryStrip({
     required this.live,
@@ -306,6 +300,8 @@ class _SummaryStrip extends StatelessWidget {
     required this.lastRefreshed,
     required this.isRefreshing,
     required this.onRefresh,
+    required this.selectedStatuses,
+    required this.onStatTap,
   });
 
   final int live;
@@ -314,45 +310,75 @@ class _SummaryStrip extends StatelessWidget {
   final DateTime? lastRefreshed;
   final bool isRefreshing;
   final VoidCallback onRefresh;
+  final Set<VehicleStatus>? selectedStatuses;
+  final void Function(Set<VehicleStatus> statuses) onStatTap;
 
-  Widget _stat(BuildContext context, int count, String label, Color dot) {
+  Widget _stat(
+    BuildContext context,
+    int count,
+    String label,
+    Color dot,
+    Set<VehicleStatus> statuses,
+  ) {
+    final selected =
+        selectedStatuses != null &&
+        selectedStatuses!.length == statuses.length &&
+        selectedStatuses!.containsAll(statuses);
     return Expanded(
-      child: Column(
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
+      child: InkWell(
+        onTap: () => onStatTap(statuses),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            color: selected
+                ? Colors.white.withValues(alpha: 0.22)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected
+                  ? Colors.white.withValues(alpha: 0.6)
+                  : Colors.transparent,
+            ),
+          ),
+          child: Column(
             children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: dot,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: dot,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '$count',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
+              const SizedBox(height: 4),
               Text(
-                '$count',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  height: 1,
+                label,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.85),
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -384,9 +410,27 @@ class _SummaryStrip extends StatelessWidget {
         children: [
           Row(
             children: [
-              _stat(context, live, 'LIVE', Colors.white),
-              _stat(context, idle, 'IDLE', AppColors.accent),
-              _stat(context, offline, 'OFFLINE', Colors.white70),
+              _stat(
+                context,
+                live,
+                'LIVE',
+                Colors.white,
+                {VehicleStatus.live},
+              ),
+              _stat(
+                context,
+                idle,
+                'IDLE',
+                AppColors.accent,
+                {VehicleStatus.idle},
+              ),
+              _stat(
+                context,
+                offline,
+                'OFFLINE',
+                Colors.white70,
+                {VehicleStatus.unknown, VehicleStatus.expired},
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -556,93 +600,107 @@ class _VehicleCard extends StatelessWidget {
         ? AppColors.live
         : AppColors.idle;
     return Card(
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      vehicle.displayName,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ),
-                  VehicleStatusChip(status: vehicle.status),
-                ],
+              Container(
+                width: 5,
+                color: AppColors.statusColor(vehicle.status),
               ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  ProviderBadge(providerKey: vehicle.providerKey),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.power_settings_new,
-                    size: 16,
-                    color: ignitionColor,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    ignition,
-                    style: TextStyle(
-                      color: ignitionColor,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (vehicle.speedKmph != null) ...[
-                    Text(
-                      vehicle.speedKmph!.toStringAsFixed(0),
-                      style: theme.textTheme.displayMedium?.copyWith(
-                        fontSize: 36,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        'km/h',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ] else
-                    Text(
-                      '—',
-                      style: theme.textTheme.displayMedium?.copyWith(
-                        fontSize: 36,
-                      ),
-                    ),
-                  const Spacer(),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        lastUpdatedLabel(vehicle),
-                        style: theme.textTheme.bodySmall,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              vehicle.displayName,
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                          ),
+                          VehicleStatusChip(status: vehicle.status),
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      Icon(
-                        Icons.chevron_right,
-                        color: theme.colorScheme.onSurfaceVariant,
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          ProviderBadge(providerKey: vehicle.providerKey),
+                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.power_settings_new,
+                            size: 16,
+                            color: ignitionColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            ignition,
+                            style: TextStyle(
+                              color: ignitionColor,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (vehicle.speedKmph != null) ...[
+                            Text(
+                              vehicle.speedKmph!.toStringAsFixed(0),
+                              style: theme.textTheme.displayMedium?.copyWith(
+                                fontSize: 36,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text(
+                                'km/h',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ] else
+                            Text(
+                              '—',
+                              style: theme.textTheme.displayMedium?.copyWith(
+                                fontSize: 36,
+                              ),
+                            ),
+                          const Spacer(),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                lastUpdatedLabel(vehicle),
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 2),
+                              Icon(
+                                Icons.chevron_right,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
             ],
           ),

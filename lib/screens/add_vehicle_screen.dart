@@ -229,20 +229,122 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
         ),
         body: Form(
           key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          child: Column(
             children: [
-              StepIndicator(
-                currentStep: _step,
-                labels: const ['Provider', 'Details', 'Test & save'],
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  children: [
+                    StepIndicator(
+                      currentStep: _step,
+                      labels: const ['Provider', 'Details', 'Test & save'],
+                    ),
+                    const SizedBox(height: 20),
+                    if (_step == 0) _buildProviderStep(),
+                    if (_step == 1) _buildDetailsStep(),
+                    if (_step == 2) _buildTestStep(),
+                  ],
+                ),
               ),
-              const SizedBox(height: 20),
-              if (_step == 0) _buildProviderStep(),
-              if (_step == 1) _buildDetailsStep(),
-              if (_step == 2) _buildTestStep(),
+              _buildBottomBar(),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Sticky action bar: the wizard's primary actions stay thumb-reachable
+  /// at the bottom instead of scrolling away with the form.
+  Widget _buildBottomBar() {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: switch (_step) {
+          0 => SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => _goToStep(1),
+              child: const Text('Continue'),
+            ),
+          ),
+          1 => Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _goToStep(0),
+                  child: const Text('Back'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: FilledButton(
+                  onPressed: _continueFromDetails,
+                  child: const Text('Continue'),
+                ),
+              ),
+            ],
+          ),
+          _ => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _testState == _TestState.testing
+                      ? null
+                      : _testConnection,
+                  icon: const Icon(Icons.wifi_tethering_outlined),
+                  label: Text(
+                    _testState == _TestState.testing
+                        ? 'Testing…'
+                        : _testState == _TestState.error
+                        ? 'Test again'
+                        : 'Test connection',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _testedOk && !_saving ? _save : null,
+                  icon: const Icon(Icons.save_outlined),
+                  label: Text(_saving ? 'Saving…' : 'Save vehicle'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.live,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+              if (!_testedOk)
+                const Padding(
+                  padding: EdgeInsets.only(top: 10),
+                  child: Text(
+                    'Test the connection first — Save unlocks after a '
+                    'successful test.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+            ],
+          ),
+        },
       ),
     );
   }
@@ -348,14 +450,6 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
             ),
           );
         }),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: () => _goToStep(1),
-            child: const Text('Continue'),
-          ),
-        ),
       ],
     );
   }
@@ -458,25 +552,6 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
             labelText: 'Display name (optional)',
             hintText: 'Friendly name for the fleet list',
           ),
-        ),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => _goToStep(0),
-                child: const Text('Back'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: FilledButton(
-                onPressed: _continueFromDetails,
-                child: const Text('Continue'),
-              ),
-            ),
-          ],
         ),
       ],
     );
@@ -682,56 +757,6 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
               ),
             ),
           ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: _testState == _TestState.testing
-                ? null
-                : _testConnection,
-            icon: const Icon(Icons.wifi_tethering_outlined),
-            label: Text(
-              _testState == _TestState.testing
-                  ? 'Testing…'
-                  : _testState == _TestState.error
-                  ? 'Test again'
-                  : 'Test connection',
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: _testedOk && !_saving ? _save : null,
-            icon: const Icon(Icons.save_outlined),
-            label: Text(_saving ? 'Saving…' : 'Save vehicle'),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.live,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ),
-        if (!_testedOk)
-          const Padding(
-            padding: EdgeInsets.only(top: 10),
-            child: Text(
-              'Test the connection first — Save unlocks after a '
-              'successful test.',
-              textAlign: TextAlign.center,
-            ),
-          ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => _goToStep(1),
-                child: const Text('Back'),
-              ),
-            ),
-          ],
-        ),
         const SizedBox(height: 16),
         const Text(
           'Credentials are stored only on this device, in secure '
