@@ -1,6 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:unitrack/models/provider_credentials.dart';
 import 'package:unitrack/models/vehicle.dart';
+import 'package:unitrack/services/providers/gps_provider_client.dart';
 import 'package:unitrack/services/providers/livetrace_client.dart';
 
 // All values below are FAKE examples — never real reg numbers, IMEIs,
@@ -71,6 +74,59 @@ void main() {
       );
       expect(auth.userId, 'demo_user');
       expect(auth.key, 'demo_key');
+    });
+  });
+
+  group('LiveTraceClient.fetchLiveVehicles device matching', () {
+    const body = '''
+{
+  "response": {
+    "LiveData": [
+      {"Lat": 12.345678, "Lon": 75.012345, "Speed": 42.5,
+       "Time": "2026-11-09 16:30:00", "Igni": true, "Nick": "BUS 01",
+       "Reg_No": "KL00XX0000", "imei": "860000000000001"},
+      {"Lat": 12.345, "Lon": 75.011, "Speed": 0,
+       "Time": "2026-11-09 16:28:00", "Igni": false, "Nick": "BUS 02",
+       "Reg_No": "KL00XX0001", "imei": "860000000000002"}
+    ]
+  }
+}
+''';
+
+    test('option 1: an IMEI device id returns only that vehicle', () async {
+      final mock = MockClient((_) async => http.Response(body, 200));
+      final vehicles = await LiveTraceClient().fetchLiveVehicles(
+        const ProviderCredentials(
+          deviceId: '860000000000002',
+          secret: 'demo_user:demo_key',
+        ),
+        httpClient: mock,
+      );
+      expect(vehicles, hasLength(1));
+      expect(vehicles[0].imei, '860000000000002');
+    });
+
+    test('option 1: an unknown IMEI throws a clear error', () async {
+      final mock = MockClient((_) async => http.Response(body, 200));
+      expect(
+        () => LiveTraceClient().fetchLiveVehicles(
+          const ProviderCredentials(
+            deviceId: '869999999999999',
+            secret: 'demo_user:demo_key',
+          ),
+          httpClient: mock,
+        ),
+        throwsA(isA<ProviderException>()),
+      );
+    });
+
+    test('option 2: a user-id device id returns the whole fleet', () async {
+      final mock = MockClient((_) async => http.Response(body, 200));
+      final vehicles = await LiveTraceClient().fetchLiveVehicles(
+        const ProviderCredentials(deviceId: 'demo_user', secret: 'demo_key'),
+        httpClient: mock,
+      );
+      expect(vehicles, hasLength(2));
     });
   });
 }

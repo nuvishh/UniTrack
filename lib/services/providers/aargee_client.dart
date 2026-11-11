@@ -108,7 +108,29 @@ class AargeeClient extends GpsProviderClient {
         'apikey': credentials.secret,
         'split_latlng': 'True',
       }, client);
-      return parseLastData(decoded);
+      final vehicles = parseLastData(decoded);
+      final deviceId = credentials.deviceId.trim();
+      if (deviceId.isEmpty) return vehicles;
+      // The device ID names one vehicle (numeric vehicle_id or
+      // 15-digit IMEI) — verify THAT vehicle is in this account
+      // instead of passing any vehicle as a success. (Same
+      // device-matching rule as HashTrace, 2026-11-11.) The last-data
+      // items carry no vehicle_id field in the parser, so match the
+      // raw value too when the API returns one.
+      final match = vehicles
+          .where((v) =>
+              v.id == deviceId ||
+              v.imei == deviceId ||
+              v.displayName == deviceId ||
+              v.rawJson['vehicle_id']?.toString() == deviceId)
+          .toList();
+      if (match.isEmpty) {
+        throw ProviderException(
+          'Aargee found no vehicle with ID "$deviceId" — check the '
+          'vehicle ID (15-digit IMEI or numeric vehicle ID).',
+        );
+      }
+      return match;
     } finally {
       if (httpClient == null) client.close();
     }

@@ -50,6 +50,19 @@ class SimplyTrackClient extends GpsProviderClient {
         imei: credentials.deviceId,
       );
     }
+    // A bare API key + a 15-digit IMEI as the device ID cannot work:
+    // the user ID is missing, and the IMEI would be sent as the
+    // userId in the URL. Fail fast with directions instead of a
+    // cryptic HTTP error (same class of bug as HashTrace's IMEI/VId
+    // mix-up, fixed 2026-11-11).
+    final deviceId = credentials.deviceId.trim();
+    if (deviceId.length == 15 && int.tryParse(deviceId) != null) {
+      throw ProviderException(
+        'SimplyTrack needs your user ID as well as the API key — '
+        'enter the key as userId:apiKey, or the device ID as '
+        'userId:imei.',
+      );
+    }
     return (
       userId: credentials.deviceId,
       apiKey: credentials.secret,
@@ -92,7 +105,21 @@ class SimplyTrackClient extends GpsProviderClient {
         auth.apiKey,
         client,
       );
-      return parseVehicleList(response.body);
+      final vehicles = parseVehicleList(response.body);
+      final imei = auth.imei;
+      if (imei == null || imei.isEmpty) return vehicles;
+      // The device IMEI was given — verify THAT vehicle exists under
+      // this account instead of passing any vehicle as a success.
+      final match = vehicles
+          .where((v) => v.imei == imei || v.id == imei)
+          .toList();
+      if (match.isEmpty) {
+        throw ProviderException(
+          'SimplyTrack found no vehicle with IMEI "$imei" — check the '
+          'device IMEI.',
+        );
+      }
+      return match;
     } finally {
       if (httpClient == null) client.close();
     }

@@ -1,6 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:unitrack/models/provider_credentials.dart';
 import 'package:unitrack/models/vehicle.dart';
+import 'package:unitrack/services/providers/gps_provider_client.dart';
 import 'package:unitrack/services/providers/simplytrack_client.dart';
 
 // All values below are FAKE examples — never real reg numbers, IMEIs,
@@ -86,6 +89,71 @@ void main() {
       expect(auth.userId, 'demo_user');
       expect(auth.apiKey, 'demo_api_key');
       expect(auth.imei, '860000000000001');
+    });
+  });
+
+  group('SimplyTrackClient.fetchLiveVehicles device matching', () {
+    const body = '''
+[
+  {"lat": 21.14277777777777, "lon": 78.75641333333333, "status": "Stopped",
+   "speed": 5, "time": "2026-11-09T09:17:43.029Z",
+   "imei": "860000000000001", "regno": "KL00XX0000", "vehicleType": "BUS",
+   "engineOn": false},
+  {"lat": 21.143, "lon": 78.757, "status": "Unreachable", "speed": null,
+   "time": "2026-11-09T09:10:00.000Z", "imei": "860000000000002",
+   "regno": "KL00XX0001", "vehicleType": "BUS", "engineOn": null}
+]
+''';
+
+    test('an IMEI device id with a bare key throws a clear error', () {
+      expect(
+        () => SimplyTrackClient.splitCredentials(
+          const ProviderCredentials(
+            deviceId: '860000000000001',
+            secret: 'demo_api_key',
+          ),
+        ),
+        throwsA(isA<ProviderException>()),
+      );
+    });
+
+    test('an IMEI device id returns only that vehicle', () async {
+      final mock = MockClient((_) async => http.Response(body, 200));
+      final vehicles = await SimplyTrackClient().fetchLiveVehicles(
+        const ProviderCredentials(
+          deviceId: '860000000000002',
+          secret: 'demo_user:demo_api_key',
+        ),
+        httpClient: mock,
+      );
+      expect(vehicles, hasLength(1));
+      expect(vehicles[0].imei, '860000000000002');
+    });
+
+    test('an unknown IMEI throws a clear error', () async {
+      final mock = MockClient((_) async => http.Response(body, 200));
+      expect(
+        () => SimplyTrackClient().fetchLiveVehicles(
+          const ProviderCredentials(
+            deviceId: '869999999999999',
+            secret: 'demo_user:demo_api_key',
+          ),
+          httpClient: mock,
+        ),
+        throwsA(isA<ProviderException>()),
+      );
+    });
+
+    test('a user-id device id returns the whole fleet', () async {
+      final mock = MockClient((_) async => http.Response(body, 200));
+      final vehicles = await SimplyTrackClient().fetchLiveVehicles(
+        const ProviderCredentials(
+          deviceId: 'demo_user',
+          secret: 'demo_api_key',
+        ),
+        httpClient: mock,
+      );
+      expect(vehicles, hasLength(2));
     });
   });
 }

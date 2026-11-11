@@ -65,7 +65,29 @@ class LiveTraceClient extends GpsProviderClient {
           'LiveTrace returned HTTP ${response.statusCode}.',
         );
       }
-      return parseLiveData(response.body);
+      final vehicles = parseLiveData(response.body);
+      final deviceId = credentials.deviceId.trim();
+      // Option 1 only (the secret holds userid:key, so the device ID
+      // names one vehicle — IMEI, reg. no. or nick). In Option 2 the
+      // device ID IS the user id, and the whole fleet is the right
+      // result — so only filter when the id differs from the user id.
+      // (Same device-matching rule as HashTrace, 2026-11-11.)
+      if (deviceId.isEmpty || deviceId == auth.userId) return vehicles;
+      final match = vehicles
+          .where((v) =>
+              v.id == deviceId ||
+              v.imei == deviceId ||
+              v.displayName == deviceId ||
+              v.rawJson['Nick']?.toString() == deviceId ||
+              v.rawJson['Reg_No']?.toString() == deviceId)
+          .toList();
+      if (match.isEmpty) {
+        throw ProviderException(
+          'LiveTrace found no vehicle with ID "$deviceId" — check the '
+          'device IMEI, reg. no. or nick.',
+        );
+      }
+      return match;
     } finally {
       if (httpClient == null) client.close();
     }

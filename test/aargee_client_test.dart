@@ -1,4 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:unitrack/models/provider_credentials.dart';
 import 'package:unitrack/models/vehicle.dart';
 import 'package:unitrack/services/providers/aargee_client.dart';
 import 'package:unitrack/services/providers/gps_provider_client.dart';
@@ -101,6 +104,56 @@ void main() {
           ),
         );
       }
+    });
+  });
+
+  group('AargeeClient.fetchLiveVehicles device matching', () {
+    const body = '''
+{"status": 1, "data": [
+  {"vehicle": "KL00XX0000", "imei": "860000000000001", "ignition": true,
+   "speed": 36.26, "location": "012.553665 075.037755",
+   "time": "2026-11-09 16:39:44"},
+  {"vehicle": "KL00XX0001", "imei": "860000000000002", "ignition": false,
+   "speed": 0, "location": "012.553665 075.037755",
+   "time": "2026-11-09 16:35:00"}
+]}
+''';
+
+    test('an IMEI device id returns only that vehicle', () async {
+      final mock = MockClient((_) async => http.Response(body, 200));
+      final vehicles = await AargeeClient().fetchLiveVehicles(
+        const ProviderCredentials(
+          deviceId: '860000000000002',
+          secret: 'fake-key',
+        ),
+        httpClient: mock,
+      );
+      expect(vehicles, hasLength(1));
+      expect(vehicles[0].imei, '860000000000002');
+    });
+
+    test('a vehicle number returns only that vehicle', () async {
+      final mock = MockClient((_) async => http.Response(body, 200));
+      final vehicles = await AargeeClient().fetchLiveVehicles(
+        const ProviderCredentials(deviceId: 'KL00XX0001', secret: 'fake-key'),
+        httpClient: mock,
+      );
+      expect(vehicles, hasLength(1));
+      expect(vehicles[0].displayName, 'KL00XX0001');
+    });
+
+    test('an unknown device ID throws a clear error', () async {
+      final mock = MockClient((_) async => http.Response(body, 200));
+      expect(
+        () => AargeeClient().fetchLiveVehicles(
+          const ProviderCredentials(
+            deviceId: '869999999999999',
+            secret: 'fake-key',
+          ),
+          httpClient: mock,
+        ),
+        throwsA(isA<ProviderException>()),
+      );
     });
   });
 }
