@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Internet is required for every provider API call. Without
+         this the app's HTTP requests fail with a socket error and
+         every Test connection reports "Could not reach ..." even
+         though the server is up (found 2026-11-11: the released
+         v1.0.3 APK had no INTERNET permission in its manifest). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="unitrack"
         android:name="${applicationName}"
