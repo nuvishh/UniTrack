@@ -11,17 +11,18 @@ import 'package:unitrack/services/providers/transight_client.dart';
 
 void main() {
   group('GpsProvider', () {
-    test('all 7 provider keys resolve', () {
+    test('all 8 provider keys resolve', () {
       const keys = [
         'transight',
         'aargee',
         'radiant',
         'mercydatrack',
+        'mercydatrack4g',
         'pauldeatrack',
         'voltysoft',
         'hashtrace',
       ];
-      expect(GpsProvider.values, hasLength(7));
+      expect(GpsProvider.values, hasLength(8));
       for (final key in keys) {
         expect(GpsProvider.fromKey(key).key, key);
       }
@@ -33,15 +34,19 @@ void main() {
 
     test('only live-snapshot providers lack history support', () {
       // Live snapshots only: HashTrace, LiveTrace, MercyDataTrack and
-      // PauldeaTrack (no history endpoint verified for the last two).
+      // PauldeaTrack (no history endpoint verified for the last two),
+      // plus MercyDataTrack (4G), whose endpoint returns today's
+      // track but no server-side history API.
       expect(GpsProvider.hashtrace.supportsHistory, isFalse);
       expect(GpsProvider.radiant.supportsHistory, isFalse);
       expect(GpsProvider.mercydatrack.supportsHistory, isFalse);
+      expect(GpsProvider.mercydatrack4g.supportsHistory, isFalse);
       expect(GpsProvider.pauldeatrack.supportsHistory, isFalse);
       for (final provider in GpsProvider.values) {
         if (provider != GpsProvider.hashtrace &&
             provider != GpsProvider.radiant &&
             provider != GpsProvider.mercydatrack &&
+            provider != GpsProvider.mercydatrack4g &&
             provider != GpsProvider.pauldeatrack) {
           expect(
             provider.supportsHistory,

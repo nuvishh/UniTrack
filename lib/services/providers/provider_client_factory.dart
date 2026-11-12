@@ -4,6 +4,7 @@ import 'aargee_client.dart';
 import 'gps_provider_client.dart';
 import 'hashtrace_client.dart';
 import 'livetrace_client.dart';
+import 'mercydatrack_4g_client.dart';
 import 'mercydatrack_client.dart';
 import 'pauldeatrack_client.dart';
 import 'remote_provider_client.dart';
@@ -21,6 +22,8 @@ GpsProviderClient clientFor(GpsProvider provider) {
       return LiveTraceClient();
     case GpsProvider.mercydatrack:
       return MercyDataTrackClient();
+    case GpsProvider.mercydatrack4g:
+      return MercyDataTrack4GClient();
     case GpsProvider.pauldeatrack:
       return PauldeaTrackClient();
     case GpsProvider.voltysoft:

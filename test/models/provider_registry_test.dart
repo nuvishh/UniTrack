@@ -5,12 +5,12 @@ import 'package:unitrack/models/provider_registry.dart';
 
 void main() {
   group('parseProviderRegistry', () {
-    test('parses the shipped registry.json: all 7 providers', () {
+    test('parses the shipped registry.json: all 8 providers', () {
       final file = File('providers/registry.json');
       expect(file.existsSync(), isTrue, reason: 'run from the repo root');
       final registry = parseProviderRegistry(file.readAsStringSync());
-      expect(registry.version, 1);
-      expect(registry.entries, hasLength(7));
+      expect(registry.version, 2);
+      expect(registry.entries, hasLength(8));
       expect(
         registry.entries.map((e) => e.key).toSet(),
         {
@@ -18,6 +18,7 @@ void main() {
           'aargee',
           'radiant',
           'mercydatrack',
+          'mercydatrack4g',
           'pauldeatrack',
           'voltysoft',
           'hashtrace',

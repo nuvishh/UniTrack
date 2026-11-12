@@ -382,7 +382,7 @@ class RegistrySuccessCheck {
 ///
 /// Invalid entries are skipped (and listed in [ProviderRegistry.warnings])
 /// instead of failing the whole file — one bad provider must never
-/// break the other six. Throws [FormatException] only when the file
+/// break the others. Throws [FormatException] only when the file
 /// itself is not JSON or has no usable `providers` list.
 ProviderRegistry parseProviderRegistry(String source) {
   final decoded = jsonDecode(source);

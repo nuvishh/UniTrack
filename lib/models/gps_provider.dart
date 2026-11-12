@@ -18,7 +18,8 @@ enum AuthType {
 /// [verified] marks the providers whose API contract was tested live
 /// against the real API (2026-11-09 for LiveTrace, SimplyTrack,
 /// HashTrace and Aargee; 2026-11-11 for MercyDataTrack, PauldeaTrack
-/// and Transight). All 7 providers are now live-verified.
+/// and Transight; 2026-11-12 for MercyDataTrack 4G). All 8 providers
+/// are now live-verified.
 enum GpsProvider {
   transight(
     key: 'transight',
@@ -67,6 +68,19 @@ enum GpsProvider {
     authType: AuthType.usernamePassword,
     deviceIdLabel: 'Vehicle Registration',
     deviceIdHint: 'Registration number, e.g. KL00XX0000',
+    secretLabel: 'Username : Password',
+    secretHint: 'username:password',
+    supportsHistory: false,
+    verified: true,
+    minPollInterval: Duration(seconds: 60),
+    rateLimitNote: 'Rate limit not documented in the guide.',
+  ),
+  mercydatrack4g(
+    key: 'mercydatrack4g',
+    displayName: 'MercyDataTrack (4G)',
+    authType: AuthType.usernamePassword,
+    deviceIdLabel: 'Vehicle Registration',
+    deviceIdHint: 'Registration number, or chassis number (4G devices)',
     secretLabel: 'Username : Password',
     secretHint: 'username:password',
     supportsHistory: false,

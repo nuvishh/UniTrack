@@ -266,6 +266,65 @@
         "style": "query"
       },
       "authKind": "usernamePassword",
+      "baseUrl": "https://proconsole.mercydatrack.com/mtrack",
+      "deviceIdHint": "Registration number, or chassis number (4G devices)",
+      "deviceIdLabel": "Vehicle Registration",
+      "deviceMatching": "strict",
+      "displayName": "MercyDataTrack (4G)",
+      "fields": {
+        "displayName": "vehicle_registration",
+        "falseValues": [
+          "OFF",
+          "off",
+          "false",
+          "0"
+        ],
+        "id": "vehicle_registration",
+        "ignition": "ignition",
+        "imei": "imei_no",
+        "lastUpdated": "sourceTime",
+        "latitude": "latitude",
+        "longitude": "longitude",
+        "speed": "speed",
+        "trueValues": [
+          "ON",
+          "on",
+          "true",
+          "1"
+        ]
+      },
+      "fleet": {
+        "method": "GET",
+        "path": "/vehicle-data",
+        "query": {
+          "password": "{password}",
+          "username": "{username}",
+          "vehicle_registration": "{deviceId}"
+        }
+      },
+      "genericCompatible": false,
+      "key": "mercydatrack4g",
+      "listPath": "data.data",
+      "minPollIntervalSeconds": 60,
+      "overrideBuiltin": false,
+      "rateLimitNote": "Live position is the latest point of today's track — no history endpoint.",
+      "secretHint": "username:password",
+      "secretLabel": "Username: Password",
+      "successCheck": {
+        "equals": "success",
+        "field": "status"
+      },
+      "supportsHistory": false,
+      "timeoutSeconds": 20,
+      "verified": true
+    },
+    {
+      "auth": {
+        "param": "username",
+        "secretFormat": "username:password",
+        "style": "query"
+      },
+      "authKind": "usernamePassword",
       "baseUrl": "https://mobiles.pauldeatrack.com/ptrack",
       "deviceIdHint": "Registration number, e.g. KL00XX0000",
       "deviceIdLabel": "Vehicle Registration",
@@ -428,5 +487,5 @@
       "verified": true
     }
   ],
-  "version": 1
+  "version": 2
 }
