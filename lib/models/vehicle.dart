@@ -1,3 +1,5 @@
+import 'vehicle_category.dart';
+
 /// Live state of a vehicle, derived from its latest provider snapshot.
 enum VehicleStatus {
   /// Ignition on (or provider reports the vehicle as moving/active).
@@ -32,6 +34,7 @@ class Vehicle {
     this.lastUpdated,
     this.status = VehicleStatus.unknown,
     this.rawJson = const {},
+    this.category = VehicleCategory.other,
   });
 
   /// Stable provider-local id: IMEI, numeric vehicle id (VId), or reg no.
@@ -69,6 +72,11 @@ class Vehicle {
   /// The provider's original JSON object, for debugging.
   final Map<String, dynamic> rawJson;
 
+  /// The kind of vehicle (bus / car / truck / bike / other), from the
+  /// saved vehicle this live snapshot belongs to. Provider clients
+  /// never set it — the tracker stamps it on after fetching.
+  final VehicleCategory category;
+
   /// True when the vehicle has a real fix. (0, 0) is never a real fix —
   /// providers use it as a placeholder, and the HashTrace `_Expired`
   /// sentinel also sits at 0, 0.
@@ -90,6 +98,7 @@ class Vehicle {
     DateTime? lastUpdated,
     VehicleStatus? status,
     Map<String, dynamic>? rawJson,
+    VehicleCategory? category,
   }) {
     return Vehicle(
       id: id ?? this.id,
@@ -104,6 +113,7 @@ class Vehicle {
       lastUpdated: lastUpdated ?? this.lastUpdated,
       status: status ?? this.status,
       rawJson: rawJson ?? this.rawJson,
+      category: category ?? this.category,
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:unitrack/models/vehicle_category.dart';
 import 'package:unitrack/services/backup_service.dart';
 
 // All values below are FAKE examples — never real reg numbers, IMEIs,
@@ -39,6 +40,45 @@ void main() {
       final json = buildBackupJson(fakeVehicles);
       expect(json, contains('"schemaVersion": 1'));
       expect(json, contains('"app": "UniTrack"'));
+    });
+
+    test('category round-trips through export -> import', () {
+      const vehicles = [
+        BackupVehicle(
+          providerKey: 'aargee',
+          deviceId: '860000000000001',
+          secret: 'fake-aargee-key',
+          category: VehicleCategory.bus,
+        ),
+        BackupVehicle(
+          providerKey: 'transight',
+          deviceId: '860000000000002',
+          secret: 'fake-transight-key',
+          category: VehicleCategory.truck,
+        ),
+      ];
+      final restored = parseBackup(buildBackupJson(vehicles));
+      expect(restored[0].category, VehicleCategory.bus);
+      expect(restored[1].category, VehicleCategory.truck);
+    });
+
+    test('a backup without a category field imports as other', () {
+      final restored = parseBackup(
+        '{"schemaVersion": 1, "vehicles": ['
+        '{"providerKey": "aargee", "deviceId": "860000000000001", '
+        '"secret": "fake-aargee-key"}]}',
+      );
+      expect(restored, hasLength(1));
+      expect(restored[0].category, VehicleCategory.other);
+    });
+
+    test('an unknown category string imports as other', () {
+      final restored = parseBackup(
+        '{"schemaVersion": 1, "vehicles": ['
+        '{"providerKey": "aargee", "deviceId": "860000000000001", '
+        '"secret": "fake-aargee-key", "category": "spaceship"}]}',
+      );
+      expect(restored[0].category, VehicleCategory.other);
     });
   });
 

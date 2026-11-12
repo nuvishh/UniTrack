@@ -7,8 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/saved_vehicle.dart';
-import '../providers/alerts_provider.dart';
-import '../providers/geofences_provider.dart';
 import '../providers/registry_provider.dart';
 import '../providers/saved_vehicles_provider.dart';
 import '../providers/storage_provider.dart';
@@ -18,9 +16,10 @@ import '../services/backup_service.dart';
 import '../services/provider_registry_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
+import '../widgets/vehicle_category_icon.dart';
 
 /// Settings: appearance, refresh interval, saved vehicles, provider
-/// status, alerts, backup & restore, and app info.
+/// status, backup & restore, and app info.
 ///
 /// Everything here is shared state from providers — theme from
 /// [themeProvider], the refresh interval from [trackerProvider], the
@@ -98,6 +97,7 @@ class SettingsScreen extends ConsumerWidget {
           secret: secret,
           regNo: vehicle.regNo,
           displayName: vehicle.displayName,
+          category: vehicle.category,
         ),
       );
     }
@@ -212,6 +212,7 @@ class SettingsScreen extends ConsumerWidget {
           deviceId: vehicle.deviceId,
           regNo: vehicle.regNo,
           displayName: vehicle.displayName,
+          category: vehicle.category,
         ),
         vehicle.secret,
       );
@@ -245,8 +246,6 @@ class SettingsScreen extends ConsumerWidget {
     final descriptors = ref.watch(providerDescriptorsProvider);
     final descriptorByKey = {for (final d in descriptors) d.key: d};
     final registryState = ref.watch(registryProvider);
-    final alertsState = ref.watch(alertsProvider);
-    final geofenceCount = ref.watch(geofencesProvider).length;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -301,70 +300,6 @@ class SettingsScreen extends ConsumerWidget {
             'providers enforce their own minimum poll interval on top '
             'of this (SimplyTrack: 60s, Aargee: 60s).',
             style: theme.textTheme.bodySmall,
-          ),
-          const SizedBox(height: 24),
-          const SectionHeader(title: 'Alerts'),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Overspeed limit',
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 10),
-                  SegmentedButton<double>(
-                    segments: [60, 80, 100, 120]
-                        .map(
-                          (v) => ButtonSegment(
-                            value: v.toDouble(),
-                            label: Text('$v'),
-                          ),
-                        )
-                        .toList(),
-                    selected: {alertsState.overspeedThresholdKmh},
-                    onSelectionChanged: (selected) {
-                      ref
-                          .read(alertsProvider.notifier)
-                          .setOverspeedThreshold(selected.first);
-                    },
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'An alert fires when a vehicle crosses above '
-                    '${alertsState.overspeedThresholdKmh.toStringAsFixed(0)} km/h. '
-                    '$geofenceCount geofence${geofenceCount == 1 ? '' : 's'} '
-                    'active — add one from a vehicle\'s detail screen.',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: alertsState.alerts.isEmpty
-                          ? null
-                          : () async {
-                              await ref
-                                  .read(alertsProvider.notifier)
-                                  .clearAll();
-                            },
-                      icon: const Icon(Icons.delete_sweep_outlined),
-                      label: Text(
-                        'Clear alert history (${alertsState.alerts.length})',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'SOS alerts are not available — no GPS provider '
-                    'reports SOS.',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
           ),
           const SizedBox(height: 24),
           const SectionHeader(title: 'Backup & restore'),
@@ -447,18 +382,13 @@ class SettingsScreen extends ConsumerWidget {
                     padding: const EdgeInsets.only(bottom: 10),
                     child: Card(
                       child: ListTile(
-                        leading: Container(
-                          width: 46,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            color: AppColors.providerColor(vehicle.providerKey)
-                                .withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.directions_bus_outlined,
-                            color: AppColors.providerColor(vehicle.providerKey),
-                          ),
+                        leading: VehicleCategoryIcon(
+                          category: vehicle.category,
+                          size: 24,
+                          color: AppColors.providerColor(vehicle.providerKey),
+                          tileColor: AppColors.providerColor(
+                            vehicle.providerKey,
+                          ).withValues(alpha: 0.14),
                         ),
                         title: Text(vehicle.displayName ?? vehicle.deviceId),
                         subtitle: Text(
@@ -561,13 +491,13 @@ class SettingsScreen extends ConsumerWidget {
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.sky.withValues(alpha: 0.16),
+                            color: AppColors.primary.withValues(alpha: 0.16),
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: const Text(
                             'Remote',
                             style: TextStyle(
-                              color: AppColors.sky,
+                              color: AppColors.primary,
                               fontWeight: FontWeight.w800,
                               fontSize: 11,
                             ),
@@ -615,7 +545,7 @@ class SettingsScreen extends ConsumerWidget {
                           children: [
                             Text('UniTrack', style: theme.textTheme.titleLarge),
                             Text(
-                              'Version 1.1.1 (build 10)',
+                              'Version 1.2.0 (build 11)',
                               style: theme.textTheme.bodySmall,
                             ),
                           ],
@@ -626,8 +556,8 @@ class SettingsScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   Text(
                     'Universal GPS tracker — one fleet across Transight, '
-                    'Aargee, LiveTrace, MercyDataTrack, PauldeaTrack, '
-                    'SimplyTrack and HashTrace.',
+                    'Aargee, LiveTrace, MercyDataTrack, MercyDataTrack '
+                    '(4G), PauldeaTrack, SimplyTrack and HashTrace.',
                     style: theme.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 8),

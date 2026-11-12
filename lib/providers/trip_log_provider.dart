@@ -12,9 +12,9 @@ import 'tracker_provider.dart';
 ///
 /// Poll snapshots are the only position history most providers give
 /// (LiveTrace, HashTrace, Mercy/Pauldea return live snapshots only),
-/// so the log is what powers day reports for them. Providers with
+/// so the log is what powers day summaries for them. Providers with
 /// server history (Aargee, Transight, SimplyTrack) merge their
-/// history with this log in the Reports screen.
+/// history with this log in the vehicle detail screen.
 ///
 /// Storage: one SharedPreferences JSON object, keyed by vehicle key
 /// (`<providerKey>:<vehicleId>`), each a compact array of points.

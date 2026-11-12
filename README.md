@@ -152,7 +152,7 @@ lib/
   main.dart               # ProviderScope + theme from themeProvider
   models/
     vehicle.dart            # one unified Vehicle for all providers
-    gps_provider.dart       # the 7 providers + auth/rate-limit metadata
+    gps_provider.dart       # the 8 providers + auth/rate-limit metadata
     provider_credentials.dart
     saved_vehicle.dart      # saved vehicle (non-secret fields only)
   providers/                # Riverpod state (see "State management")
@@ -170,9 +170,10 @@ lib/
       simplytrack_client.dart       # voltysoft — verified
       hashtrace_client.dart         # verified
       aargee_client.dart            # verified
-      transight_client.dart         # TODO — endpoints unverified
-      mercydatrack_client.dart      # TODO — endpoints unverified
-      pauldeatrack_client.dart      # TODO — endpoints unverified
+      transight_client.dart         # verified
+      mercydatrack_client.dart      # verified
+      mercydatrack_4g_client.dart   # verified (4G console)
+      pauldeatrack_client.dart      # verified
   screens/
     fleet_list_screen.dart
     map_screen.dart
@@ -199,8 +200,4 @@ test/
 
 1. Run it on a real device and add one vehicle per provider with your
    own keys — use **Test connection** on the add screen.
-2. Confirm the Transight / MercyDataTrack / PauldeaTrack endpoint
-   paths against their API docs, implement the three TODO clients,
-   and flip their `verified` flags.
-3. Optional later: geofence alerts, trip replay playback, per-vehicle
-   refresh control.
+2. Optional later: trip replay playback, per-vehicle refresh control.

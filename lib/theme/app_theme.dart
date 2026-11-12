@@ -4,24 +4,34 @@ import '../models/vehicle.dart';
 
 /// UniTrack design system.
 ///
-/// Bold, warm and confident — strong colours, big readable type, generous
-/// spacing and expressive rounded cards. Deliberately NOT a flat minimal
-/// grey look: the fleet status must read at a glance from across the
-/// room, and the primary actions must feel big and tappable.
+/// Material 3, prototype-inspired (v1.2.0): indigo primary, bold
+/// readable type, generous spacing and expressive rounded cards.
+/// Deliberately NOT a flat minimal grey look: the fleet status must
+/// read at a glance from across the room, and the primary actions
+/// must feel big and tappable.
 ///
-/// Modern refresh (2026-11-11): softer tonal cards with a hairline
-/// outline instead of hard shadows, larger radii, and a thumb-reachable
-/// bottom navigation bar as the app's main navigation.
+/// The fleet summary strip is a gradient (indigo → blue → cyan) and
+/// the bottom navigation uses an M3 active pill (indigo-100 in
+/// light, indigo-800 in dark).
 class AppColors {
-  // Brand.
-  static const Color primary = Color(0xFF2547F4); // vivid royal blue
-  static const Color primaryDarkTheme = Color(0xFF38BDF8); // sky blue
+  // Brand — Material 3 indigo, from the UI prototype.
+  static const Color primary = Color(0xFF4F46E5); // indigo-600
   static const Color secondary = Color(0xFF00A896); // teal
   static const Color accent = Color(0xFFFFB020); // warm amber
 
-  /// Sky blue — the Volty-style highlight for interactive elements in
-  /// the dark theme (active chips, FAB, navigation indicator).
-  static const Color sky = Color(0xFF38BDF8);
+  /// Indigo-100 — the active-pill background in the light theme.
+  static const Color primaryContainerLight = Color(0xFFE0E7FF);
+
+  /// Indigo-800 — the active-pill background in the dark theme.
+  static const Color primaryContainerDark = Color(0xFF312E81);
+
+  /// Gradient stops for the fleet summary strip
+  /// (indigo → blue → cyan, as in the prototype).
+  static const List<Color> summaryGradient = [
+    Color(0xFF4F46E5),
+    Color(0xFF2563EB),
+    Color(0xFF06B6D4),
+  ];
 
   // Fleet status — vivid and unmistakable.
   static const Color live = Color(0xFF00A651);
@@ -29,15 +39,15 @@ class AppColors {
   static const Color unknown = Color(0xFF8A8FA3);
   static const Color expired = Color(0xFFE5484D);
 
-  // Light theme surfaces.
-  static const Color lightBackground = Color(0xFFF3F4FA);
+  // Light theme surfaces — slate-50 background, white cards.
+  static const Color lightBackground = Color(0xFFF8FAFC);
   static const Color lightSurface = Color(0xFFFFFFFF);
   static const Color lightInk = Color(0xFF14142B);
   static const Color lightMuted = Color(0xFF5A5E73);
   static const Color lightFieldFill = Color(0xFFECEEF6);
 
-  // Dark theme surfaces — deep navy, not plain black.
-  static const Color darkBackground = Color(0xFF0C0F24);
+  // Dark theme surfaces — deep navy #0B1120, not plain black.
+  static const Color darkBackground = Color(0xFF0B1120);
   static const Color darkSurface = Color(0xFF181C38);
   static const Color darkSurfaceRaised = Color(0xFF20264A);
   static const Color darkInk = Color(0xFFF2F3FA);
@@ -83,11 +93,11 @@ class AppColors {
 /// The two UniTrack themes (light + dark). Everything screens build with
 /// comes from here — no hard-coded colours or text styles in screens.
 ///
-/// Volty-inspired polish (v1.1.0): the dark theme uses a sky-blue
-/// primary for interactive highlights (active chips, FAB, navigation
-/// indicator) over deep-navy surfaces, with slightly stronger card
-/// outlines so cards read on small phones. Status colours keep their
-/// meaning in both themes.
+/// M3 indigo (v1.2.0): the same indigo-600 primary in both themes over
+/// deep-navy dark surfaces, with an M3 active-pill navigation
+/// indicator (indigo-100 light / indigo-800 dark) and slightly
+/// stronger card outlines so cards read on small phones. Status
+/// colours keep their meaning in both themes.
 class AppTheme {
   static const double cardRadius = 20;
   static const double fieldRadius = 16;
@@ -98,7 +108,7 @@ class AppTheme {
 
   static ThemeData _build(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
-    final primary = isDark ? AppColors.primaryDarkTheme : AppColors.primary;
+    final primary = AppColors.primary;
     final background = isDark
         ? AppColors.darkBackground
         : AppColors.lightBackground;
@@ -180,6 +190,13 @@ class AppTheme {
     final buttonShape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(buttonRadius),
     );
+
+    // Selected nav icon/label: indigo-600 on the light pill,
+    // indigo-300 on the dark pill (indigo-600 on indigo-800 would
+    // be unreadable).
+    final selectedNavColor = isDark
+        ? const Color(0xFFA5B4FC)
+        : primary;
 
     return ThemeData(
       useMaterial3: true,
@@ -295,12 +312,16 @@ class AppTheme {
         backgroundColor: surface,
         elevation: 2,
         shadowColor: Colors.black.withValues(alpha: 0.1),
-        indicatorColor: primary.withValues(alpha: 0.18),
+        // M3 active pill: solid indigo-100 / indigo-800, as in the
+        // prototype — not a translucent wash.
+        indicatorColor: isDark
+            ? AppColors.primaryContainerDark
+            : AppColors.primaryContainerLight,
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
             size: 26,
             color: states.contains(WidgetState.selected)
-                ? primary
+                ? selectedNavColor
                 : muted,
           ),
         ),
@@ -309,7 +330,7 @@ class AppTheme {
             fontSize: 12,
             fontWeight: FontWeight.w800,
             color: states.contains(WidgetState.selected)
-                ? primary
+                ? selectedNavColor
                 : muted,
           ),
         ),

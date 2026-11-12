@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/provider_credentials.dart';
 import '../models/provider_descriptor.dart';
 import '../models/saved_vehicle.dart';
+import '../models/vehicle_category.dart';
 import '../providers/registry_provider.dart';
 import '../providers/storage_provider.dart';
 import '../services/providers/gps_provider_client.dart';
@@ -22,8 +23,19 @@ import '../widgets/app_widgets.dart';
 /// The wizard step, the test state and the form are local, ephemeral
 /// screen state — plain setState. Only the save goes through a
 /// provider (the storage provider).
+///
+/// When embedded as the Add tab ([onSaved]/[onBack] set), saving or
+/// backing out returns to the Fleet tab instead of popping a route —
+/// there is no route to pop inside the tab shell.
 class AddVehicleScreen extends ConsumerStatefulWidget {
-  const AddVehicleScreen({super.key});
+  const AddVehicleScreen({super.key, this.onSaved, this.onBack});
+
+  /// Called after a successful save, instead of popping the route.
+  final VoidCallback? onSaved;
+
+  /// Called when the user backs out of step 1, instead of popping
+  /// the route.
+  final VoidCallback? onBack;
 
   @override
   ConsumerState<AddVehicleScreen> createState() => _AddVehicleScreenState();
@@ -49,6 +61,10 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
   _TestState _testState = _TestState.idle;
   String? _testMessage;
   int _testCount = 0;
+
+  /// Vehicle type for this vehicle. Defaults to [VehicleCategory.other]
+  /// — the user picks it in the credentials step.
+  VehicleCategory _category = VehicleCategory.other;
 
   @override
   void dispose() {
@@ -198,15 +214,37 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
         displayName: _displayNameController.text.trim().isEmpty
             ? null
             : _displayNameController.text.trim(),
+        category: _category,
       );
       await ref
           .read(secureStorageServiceProvider)
           .saveVehicle(vehicle, _secretController.text.trim());
       if (!mounted) return;
-      Navigator.of(context).pop();
+      final onSaved = widget.onSaved;
+      if (onSaved != null) {
+        // Embedded as a tab: reset the wizard for the next vehicle
+        // and hand navigation back to the caller (Fleet tab).
+        _resetWizard();
+        onSaved();
+      } else {
+        Navigator.of(context).pop();
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// Clears the wizard back to a fresh step 1.
+  void _resetWizard() {
+    _deviceIdController.clear();
+    _secretController.clear();
+    _regNoController.clear();
+    _displayNameController.clear();
+    _resetTest();
+    setState(() {
+      _step = 0;
+      _category = VehicleCategory.other;
+    });
   }
 
   String _authDescription(String authKind) {
@@ -222,10 +260,25 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
     }
   }
 
+  void _handleBack() {
+    if (_step > 0) {
+      _goToStep(_step - 1);
+      return;
+    }
+    final onBack = widget.onBack;
+    if (onBack != null) {
+      onBack();
+    } else {
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: _step == 0,
+      // Embedded as a tab there is no route to pop from step 1 —
+      // the back button goes to Fleet instead (see [_handleBack]).
+      canPop: _step == 0 && widget.onBack == null,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop && _step > 0) _goToStep(_step - 1);
       },
@@ -234,13 +287,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             tooltip: _step == 0 ? 'Back' : 'Previous step',
-            onPressed: () {
-              if (_step > 0) {
-                _goToStep(_step - 1);
-              } else {
-                Navigator.of(context).pop();
-              }
-            },
+            onPressed: _handleBack,
           ),
           title: const Text('Add vehicle'),
         ),
@@ -442,7 +489,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                                       vertical: 3,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: AppColors.sky.withValues(
+                                      color: AppColors.primary.withValues(
                                         alpha: 0.16,
                                       ),
                                       borderRadius: BorderRadius.circular(999),
@@ -450,7 +497,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                                     child: const Text(
                                       'Remote',
                                       style: TextStyle(
-                                        color: AppColors.sky,
+                                        color: AppColors.primary,
                                         fontWeight: FontWeight.w800,
                                         fontSize: 11,
                                       ),
@@ -596,6 +643,35 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
             labelText: 'Display name (optional)',
             hintText: 'Friendly name for the fleet list',
           ),
+        ),
+        const SizedBox(height: 24),
+        Text('Vehicle type', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text(
+          'Shown as an icon on fleet cards and the map.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: VehicleCategory.values.map((category) {
+            final selected = category == _category;
+            return ChoiceChip(
+              label: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(category.icon, size: 18),
+                  const SizedBox(width: 6),
+                  Text(category.label),
+                ],
+              ),
+              selected: selected,
+              onSelected: (_) => setState(() => _category = category),
+            );
+          }).toList(),
         ),
       ],
     );

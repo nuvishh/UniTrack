@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../models/vehicle_category.dart';
+
 /// Backup & restore for the vehicle configuration.
 ///
 /// Export writes one JSON file with every saved vehicle — provider key,
@@ -31,6 +33,7 @@ class BackupVehicle {
     required this.secret,
     this.regNo,
     this.displayName,
+    this.category = VehicleCategory.other,
   });
 
   final String providerKey;
@@ -41,12 +44,17 @@ class BackupVehicle {
   final String? regNo;
   final String? displayName;
 
+  /// Vehicle category. Optional in the file: backups exported before
+  /// categories existed have no such field and import as [other].
+  final VehicleCategory category;
+
   Map<String, dynamic> toJson() => {
     'providerKey': providerKey,
     'deviceId': deviceId,
     'secret': secret,
     if (regNo != null) 'regNo': regNo,
     if (displayName != null) 'displayName': displayName,
+    'category': category.name,
   };
 
   /// Strict parse: missing or wrongly-typed required fields fail.
@@ -82,12 +90,17 @@ class BackupVehicle {
         'A vehicle entry has a bad displayName.',
       );
     }
+    final category = json['category'];
+    if (category != null && category is! String) {
+      throw BackupFormatException('A vehicle entry has a bad category.');
+    }
     return BackupVehicle(
       providerKey: providerKey.trim(),
       deviceId: deviceId.trim(),
       secret: secret,
       regNo: regNo as String?,
       displayName: displayName as String?,
+      category: VehicleCategory.fromKey(category as String?),
     );
   }
 }

@@ -129,7 +129,10 @@ class TrackerService {
       );
       _lastFetchByAccount[accountKey] = DateTime.now();
       for (final vehicle in fetched) {
-        merged['${vehicle.providerKey}:${vehicle.id}'] = vehicle;
+        // Stamp the saved vehicle's category on the live snapshot —
+        // provider clients never know the vehicle type.
+        merged['${vehicle.providerKey}:${vehicle.id}'] =
+            vehicle.copyWith(category: account.category);
       }
     } on ProviderException catch (e) {
       errors.add('$displayName: ${e.message}');

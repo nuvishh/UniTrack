@@ -1,3 +1,5 @@
+import 'vehicle_category.dart';
+
 /// A vehicle the user added in UniTrack.
 ///
 /// Only non-secret fields live here — this is what gets stored in
@@ -11,6 +13,7 @@ class SavedVehicle {
     required this.deviceId,
     this.regNo,
     this.displayName,
+    this.category = VehicleCategory.other,
   });
 
   /// Local id, unique per saved vehicle.
@@ -28,12 +31,18 @@ class SavedVehicle {
   /// Optional friendly name shown in the fleet list.
   final String? displayName;
 
+  /// The kind of vehicle (bus / car / truck / bike / other), picked
+  /// in the add-vehicle wizard. Defaults to [VehicleCategory.other]
+  /// for saves from before categories existed.
+  final VehicleCategory category;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'providerKey': providerKey,
     'deviceId': deviceId,
     if (regNo != null) 'regNo': regNo,
     if (displayName != null) 'displayName': displayName,
+    'category': category.name,
   };
 
   factory SavedVehicle.fromJson(Map<String, dynamic> json) {
@@ -43,6 +52,7 @@ class SavedVehicle {
       deviceId: json['deviceId'] as String,
       regNo: json['regNo'] as String?,
       displayName: json['displayName'] as String?,
+      category: VehicleCategory.fromKey(json['category'] as String?),
     );
   }
 }

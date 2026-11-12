@@ -166,10 +166,17 @@ class EmptyState extends StatelessWidget {
             ),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: onAction,
-                icon: const Icon(Icons.add),
-                label: Text(actionLabel!),
+              // Full-width button: the label ("Add your first vehicle")
+              // is too wide for the narrow map empty-state card at
+              // 360 dp otherwise. FilledButton.icon already wraps the
+              // label in a Flexible, so it wraps instead of overflowing.
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: onAction,
+                  icon: const Icon(Icons.add),
+                  label: Text(actionLabel!, textAlign: TextAlign.center),
+                ),
               ),
             ],
           ],

@@ -48,14 +48,6 @@ const _months = [
   'Dec',
 ];
 
-/// Absolute alert time, Volty-style: "Nov 12, 9:59 AM".
-String formatAlertTime(DateTime when) {
-  final hour12 = when.hour % 12 == 0 ? 12 : when.hour % 12;
-  final amPm = when.hour < 12 ? 'AM' : 'PM';
-  final minute = when.minute.toString().padLeft(2, '0');
-  return '${_months[when.month - 1]} ${when.day}, $hour12:$minute $amPm';
-}
-
 /// Short day label: "Today", "Yesterday", or "Nov 12".
 String dayLabel(DateTime day, {DateTime? now}) {
   final today = now ?? DateTime.now();

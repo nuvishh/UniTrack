@@ -99,7 +99,8 @@ DaySummary computeDaySummary(List<TripPoint> points, DateTime day) {
 }
 
 /// Builds a CSV of the day: a summary block, then one row per point.
-/// Shared from the Reports screen (share sheet) — no file is written.
+/// Shared from the vehicle detail screen's "Today's trip" section
+/// (share sheet) — no file is written.
 String daySummaryCsv({
   required String vehicleName,
   required DaySummary summary,

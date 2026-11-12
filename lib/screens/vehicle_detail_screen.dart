@@ -3,15 +3,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:share_plus/share_plus.dart';
 
-import '../models/geofence.dart';
+import '../models/trip_point.dart';
 import '../models/vehicle.dart';
-import '../providers/geofences_provider.dart';
 import '../providers/registry_provider.dart';
 import '../providers/tracker_provider.dart';
+import '../providers/trip_log_provider.dart';
 import '../services/providers/gps_provider_client.dart';
+import '../services/trip_summary.dart';
 import '../theme/app_theme.dart';
+import '../utils/geo.dart';
 import '../widgets/app_widgets.dart';
+import '../widgets/vehicle_category_icon.dart';
 import '../widgets/vehicle_status_chip.dart';
 import 'map_screen.dart';
 
@@ -348,10 +352,24 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                           style: theme.textTheme.titleLarge,
                         ),
                       ),
+                      VehicleCategoryIcon(
+                        category: vehicle.category,
+                        size: 20,
+                        color: theme.colorScheme.primary,
+                        tileColor: theme.colorScheme.primary.withValues(
+                          alpha: 0.12,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       ProviderBadge(providerKey: vehicle.providerKey),
                     ],
                   ),
                   const SizedBox(height: 8),
+                  _infoRow(
+                    vehicle.category.icon,
+                    'Type',
+                    vehicle.category.label,
+                  ),
                   _infoRow(
                     Icons.business_outlined,
                     'Provider',
@@ -393,9 +411,10 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          // Geofences for this vehicle (alerts on enter/exit).
-          const SectionHeader(title: 'Geofences'),
-          _GeofenceSection(vehicle: vehicle),
+          // Today's trip, from the local trip log (recorded on every
+          // poll — works for live-snapshot-only providers too).
+          const SectionHeader(title: "Today's trip"),
+          _TodaysTripSection(vehicle: vehicle),
           const SizedBox(height: 20),
           if (!supportsHistory)
             Card(
@@ -502,150 +521,148 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
   }
 }
 
-/// Geofences watching this vehicle: list + "Add geofence here"
-/// (centred on the vehicle's current position, radius chosen in a
-/// dialog). Enter/exit crossings become Alerts.
-class _GeofenceSection extends ConsumerWidget {
-  const _GeofenceSection({required this.vehicle});
+/// Compact "Today's trip" summary from the local trip log: total
+/// distance and driving / idling / stopped time for today.
+///
+/// The log records one point per poll, so this works for
+/// live-snapshot-only providers too (Mercy, Pauldea, LiveTrace,
+/// HashTrace). The "Today's route" section below adds the server
+/// history map where the provider supports it.
+class _TodaysTripSection extends ConsumerWidget {
+  const _TodaysTripSection({required this.vehicle});
 
   final Vehicle vehicle;
 
-  Future<void> _add(BuildContext context, WidgetRef ref) async {
-    if (!vehicle.hasFix) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No live location yet — wait for a fix first.'),
-        ),
-      );
-      return;
-    }
-    final radius = await showDialog<double>(
-      context: context,
-      builder: (context) => const _RadiusDialog(),
-    );
-    if (radius == null || !context.mounted) return;
-    final fence = Geofence(
-      id: '${DateTime.now().millisecondsSinceEpoch}',
-      vehicleKey: '${vehicle.providerKey}:${vehicle.id}',
-      name: vehicle.displayName,
-      latitude: vehicle.latitude!,
-      longitude: vehicle.longitude!,
-      radiusM: radius,
-    );
-    await ref.read(geofencesProvider.notifier).add(fence);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Geofence added — ${fence.radiusLabel} around '
-            '${vehicle.displayName}.',
+  Widget _stat(
+    BuildContext context,
+    String label,
+    String value,
+    Color color,
+  ) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: theme.textTheme.titleMedium?.copyWith(color: color),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      );
-    }
+          const SizedBox(height: 2),
+          Text(label, style: theme.textTheme.bodySmall),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final key = '${vehicle.providerKey}:${vehicle.id}';
-    final fences = ref
-        .watch(geofencesProvider)
-        .where((f) => f.vehicleKey == key)
-        .toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (fences.isEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'No geofences for this vehicle yet. Add one to get an '
-                'alert when it enters or leaves the area.',
-                style: theme.textTheme.bodyMedium,
-              ),
-            ),
-          )
-        else
-          ...fences.map(
-            (fence) => Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: const Icon(Icons.place_outlined),
-                title: Text(fence.name),
-                subtitle: Text(
-                  '${fence.radiusLabel} · '
-                  '${fence.latitude.toStringAsFixed(5)}, '
-                  '${fence.longitude.toStringAsFixed(5)}',
-                ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Remove geofence',
-                  onPressed: () => ref
-                      .read(geofencesProvider.notifier)
-                      .remove(fence.id),
+    // Watch the log so the section updates as new points arrive.
+    ref.watch(tripLogProvider);
+    final key = vehicleKey(vehicle.providerKey, vehicle.id);
+    final points = ref
+        .read(tripLogProvider.notifier)
+        .pointsFor(key, day: DateTime.now());
+    final summary = computeDaySummary(points, DateTime.now());
+    if (summary.points == 0) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.route_outlined),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'No trip data today yet — positions are recorded '
+                  'while the app polls. Check back after a drive.',
+                  style: theme.textTheme.bodyMedium,
                 ),
               ),
-            ),
+            ],
           ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: vehicle.hasFix ? () => _add(context, ref) : null,
-          icon: const Icon(Icons.add_location_alt_outlined),
-          label: const Text('Add geofence here'),
         ),
-      ],
+      );
+    }
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                _stat(
+                  context,
+                  'Distance',
+                  formatDistanceKm(summary.distanceKm),
+                  AppColors.live,
+                ),
+                _stat(
+                  context,
+                  'Driving',
+                  formatDuration(summary.driving),
+                  theme.colorScheme.primary,
+                ),
+                _stat(
+                  context,
+                  'Idling',
+                  formatDuration(summary.idling),
+                  AppColors.idle,
+                ),
+                _stat(
+                  context,
+                  'Stopped',
+                  formatDuration(summary.stopped),
+                  AppColors.expired,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${summary.points} point(s) today · Local trip log',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _exportCsv(context, points, summary),
+                icon: const Icon(Icons.share_outlined),
+                label: const Text('Export today as CSV'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
-}
 
-/// Radius picker for a new geofence.
-class _RadiusDialog extends StatefulWidget {
-  const _RadiusDialog();
-
-  @override
-  State<_RadiusDialog> createState() => _RadiusDialogState();
-}
-
-class _RadiusDialogState extends State<_RadiusDialog> {
-  double _radius = 250;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Geofence radius'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'The geofence is centred on the vehicle\'s current location.',
-          ),
-          const SizedBox(height: 16),
-          SegmentedButton<double>(
-            segments: const [
-              ButtonSegment(value: 100, label: Text('100 m')),
-              ButtonSegment(value: 250, label: Text('250 m')),
-              ButtonSegment(value: 500, label: Text('500 m')),
-              ButtonSegment(value: 1000, label: Text('1 km')),
-            ],
-            selected: {_radius},
-            onSelectionChanged: (selected) =>
-                setState(() => _radius = selected.first),
-          ),
-        ],
+  Future<void> _exportCsv(
+    BuildContext context,
+    List<TripPoint> points,
+    DaySummary summary,
+  ) async {
+    final csv = daySummaryCsv(
+      vehicleName: vehicle.displayName,
+      summary: summary,
+      points: points,
+    );
+    final day = DateTime.now();
+    final filename =
+        'unitrack-${vehicle.displayName}-${day.year}-'
+        '${day.month.toString().padLeft(2, '0')}-'
+        '${day.day.toString().padLeft(2, '0')}.csv';
+    await SharePlus.instance.share(
+      ShareParams(text: csv, subject: filename),
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Report shared — save it from the share sheet.'),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_radius),
-          child: const Text('Add'),
-        ),
-      ],
     );
   }
 }

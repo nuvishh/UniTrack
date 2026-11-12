@@ -8,23 +8,30 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/provider_descriptor.dart';
 import '../models/vehicle.dart';
+import '../models/vehicle_category.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/registry_provider.dart';
+import '../providers/theme_provider.dart';
 import '../providers/tracker_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_format.dart';
 import '../widgets/app_widgets.dart';
+import '../widgets/vehicle_category_icon.dart';
 import '../widgets/vehicle_status_chip.dart';
 import 'add_vehicle_screen.dart';
 import 'vehicle_detail_screen.dart';
 
 /// Home screen: every vehicle from every provider, with a live summary,
-/// search, provider filters and big readable vehicle cards.
+/// search, provider + category filters and big readable vehicle cards.
+///
+/// The fleet screen is also the app's dashboard now (v1.2.0): the
+/// gradient summary strip on top carries the Live / Idle / Offline
+/// counts, tappable as status filters.
 ///
 /// Shared state (the fleet, refreshing flag, last error) comes from
 /// [trackerProvider] via `ref.watch`. Only the search query, the
-/// selected provider filter and the "last refreshed" label are local
-/// widget state, kept with setState — that is the rule: Riverpod for
+/// selected filters and the "last refreshed" label are local widget
+/// state, kept with setState — that is the rule: Riverpod for
 /// shared state, setState only for ephemeral local UI state.
 class FleetListScreen extends ConsumerStatefulWidget {
   const FleetListScreen({super.key});
@@ -37,6 +44,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedProviderKey = 'all';
+  VehicleCategory? _selectedCategory;
   Set<VehicleStatus>? _selectedStatuses;
 
   /// Narrows a LIVE selection further by motion: true = moving
@@ -98,6 +106,9 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
     if (_selectedProviderKey != 'all') {
       list = list.where((v) => v.providerKey == _selectedProviderKey).toList();
     }
+    if (_selectedCategory != null) {
+      list = list.where((v) => v.category == _selectedCategory).toList();
+    }
     if (_selectedStatuses != null) {
       list = list.where((v) => _selectedStatuses!.contains(v.status)).toList();
     }
@@ -136,6 +147,17 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
     return list;
   }
 
+  void _toggleTheme() {
+    final mode = ref.read(themeProvider);
+    final isDark =
+        mode == ThemeMode.dark ||
+        (mode == ThemeMode.system &&
+            Theme.of(context).brightness == Brightness.dark);
+    ref
+        .read(themeProvider.notifier)
+        .setMode(isDark ? ThemeMode.light : ThemeMode.dark);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -162,22 +184,50 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
         )
         .length;
     final idleMovingCount = liveCount - movingCount;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            const Text('UniTrack'),
-            Text(
-              vehicles.isEmpty
-                  ? 'All your GPS providers, one fleet'
-                  : '${vehicles.length} vehicle${vehicles.length == 1 ? '' : 's'} · ${vehicles.map((v) => v.providerKey).toSet().length} provider${vehicles.map((v) => v.providerKey).toSet().length == 1 ? '' : 's'}',
-              style: theme.textTheme.bodySmall,
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.location_on,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('UniTrack'),
+                  Text(
+                    vehicles.isEmpty
+                        ? 'All your GPS providers, one fleet'
+                        : '${vehicles.length} vehicle${vehicles.length == 1 ? '' : 's'} · ${vehicles.map((v) => v.providerKey).toSet().length} provider${vehicles.map((v) => v.providerKey).toSet().length == 1 ? '' : 's'}',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+            ),
+            tooltip: isDark ? 'Switch to light theme' : 'Switch to dark theme',
+            onPressed: _toggleTheme,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh now',
@@ -231,6 +281,13 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
               descriptors: descriptorByKey,
               selectedKey: _selectedProviderKey,
               onSelected: (key) => setState(() => _selectedProviderKey = key),
+            ),
+          if (vehicles.isNotEmpty)
+            _CategoryFilterChips(
+              vehicles: vehicles,
+              selected: _selectedCategory,
+              onSelected: (category) =>
+                  setState(() => _selectedCategory = category),
             ),
           if (vehicles.isNotEmpty)
             _StatusFilterChips(
@@ -292,34 +349,42 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
           ],
         );
       }
-      return EmptyState(
-        icon: Icons.directions_bus_outlined,
-        title: 'No vehicles yet',
-        message:
-            'Add a vehicle from any GPS provider — Transight, Aargee, '
-            'LiveTrace, MercyDataTrack, PauldeaTrack, SimplyTrack or '
-            'HashTrace — and track them all here.',
-        actionLabel: 'Add your first vehicle',
-        onAction: _openAddVehicle,
+      // The empty state is tall (icon + long message + button); on a
+      // short screen the filter rows above leave too little room, so
+      // it scrolls instead of overflowing.
+      return _ScrollableEmptyState(
+        child: EmptyState(
+          icon: Icons.directions_bus_outlined,
+          title: 'No vehicles yet',
+          message:
+              'Add a vehicle from any GPS provider — Transight, Aargee, '
+              'LiveTrace, MercyDataTrack, PauldeaTrack, SimplyTrack or '
+              'HashTrace — and track them all here.',
+          actionLabel: 'Add your first vehicle',
+          onAction: _openAddVehicle,
+        ),
       );
     }
     if (filtered.isEmpty) {
-      return EmptyState(
-        icon: Icons.search_off_outlined,
-        title: 'No matches',
-        message:
-            'Nothing in the fleet matches "$_searchQuery". '
-            'Try a different reg no, provider or status.',
-        actionLabel: 'Clear search & filters',
-        onAction: () {
-          _searchController.clear();
-          setState(() {
-            _searchQuery = '';
-            _selectedProviderKey = 'all';
-            _selectedStatuses = null;
-            _movingOnly = null;
-          });
-        },
+      return _ScrollableEmptyState(
+        child: EmptyState(
+          icon: Icons.search_off_outlined,
+          title: 'No matches',
+          message:
+              'Nothing in the fleet matches "$_searchQuery". '
+              'Try a different reg no, provider or status.',
+          actionLabel: 'Clear search & filters',
+          onAction: () {
+            _searchController.clear();
+            setState(() {
+              _searchQuery = '';
+              _selectedProviderKey = 'all';
+              _selectedCategory = null;
+              _selectedStatuses = null;
+              _movingOnly = null;
+            });
+          },
+        ),
       );
     }
     return RefreshIndicator(
@@ -337,7 +402,6 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
               onTap: () => _openDetail(vehicle),
               onNavigate: () => _navigate(vehicle),
               onShare: () => _share(vehicle),
-              onReports: () => _openReports(vehicle),
               onMap: () => _openOnMap(vehicle),
             ),
           );
@@ -388,16 +452,31 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
     }
   }
 
-  void _openReports(Vehicle vehicle) {
-    ref
-        .read(homeNavProvider.notifier)
-        .openReportsFor('${vehicle.providerKey}:${vehicle.id}');
-  }
-
   void _openOnMap(Vehicle vehicle) {
     ref
         .read(homeNavProvider.notifier)
         .focusVehicleOnMap('${vehicle.providerKey}:${vehicle.id}');
+  }
+}
+
+/// Empty state that scrolls when the space above it (summary strip +
+/// filter rows) leaves too little room, and centres its content when
+/// there is room to spare.
+class _ScrollableEmptyState extends StatelessWidget {
+  const _ScrollableEmptyState({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: child,
+        ),
+      ),
+    );
   }
 }
 
@@ -507,7 +586,7 @@ class _SummaryStrip extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [AppColors.primary, Color(0xFF00A896)],
+          colors: AppColors.summaryGradient,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -658,6 +737,101 @@ class _ProviderFilterChips extends StatelessWidget {
   }
 }
 
+/// Vehicle-type filter chips: All + one per category present in the
+/// fleet, with counts. Combines with the search, status and provider
+/// filters — a vehicle must pass all of them to show.
+class _CategoryFilterChips extends StatelessWidget {
+  const _CategoryFilterChips({
+    required this.vehicles,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<Vehicle> vehicles;
+  final VehicleCategory? selected;
+  final void Function(VehicleCategory?) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final counts = <VehicleCategory, int>{};
+    for (final v in vehicles) {
+      counts[v.category] = (counts[v.category] ?? 0) + 1;
+    }
+    final categories = VehicleCategory.values
+        .where((c) => counts.containsKey(c))
+        .toList();
+    if (categories.isEmpty) return const SizedBox.shrink();
+    Widget chip({
+      required Widget label,
+      required bool isSelected,
+      required VoidCallback onTap,
+    }) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: DefaultTextStyle(
+              style: TextStyle(
+                color: isSelected
+                    ? Colors.white
+                    : theme.colorScheme.onSurface,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+              child: IconTheme(
+                data: IconThemeData(
+                  size: 18,
+                  color: isSelected
+                      ? Colors.white
+                      : theme.colorScheme.onSurface,
+                ),
+                child: label,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        children: [
+          chip(
+            label: Text('All (${vehicles.length})'),
+            isSelected: selected == null,
+            onTap: () => onSelected(null),
+          ),
+          ...categories.map(
+            (category) => chip(
+              label: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(category.icon),
+                  const SizedBox(width: 6),
+                  Text('${category.label} (${counts[category]})'),
+                ],
+              ),
+              isSelected: selected == category,
+              onTap: () => onSelected(category),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Status filter chips, Volty-style: All / Moving / Idle / Stopped,
 /// with counts. They write the same filter state as the tappable
 /// summary strip above (Moving = live + speed above 5 km/h, Idle =
@@ -793,16 +967,15 @@ class _InlineErrorBanner extends StatelessWidget {
   }
 }
 
-/// One vehicle, big and readable: reg no, status pill, provider badge,
-/// ignition, large speed and relative update time — plus the four
-/// Volty-style actions: Navigate / Share / Reports / Map.
+/// One vehicle, big and readable: category icon, reg no, status pill,
+/// provider badge, ignition, large speed and relative update time —
+/// plus the three actions: Navigate / Share / Map.
 class _VehicleCard extends StatelessWidget {
   const _VehicleCard({
     required this.vehicle,
     required this.onTap,
     required this.onNavigate,
     required this.onShare,
-    required this.onReports,
     required this.onMap,
   });
 
@@ -810,7 +983,6 @@ class _VehicleCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onNavigate;
   final VoidCallback onShare;
-  final VoidCallback onReports;
   final VoidCallback onMap;
 
   Widget _action(
@@ -891,6 +1063,15 @@ class _VehicleCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
+                          VehicleCategoryIcon(
+                            category: vehicle.category,
+                            size: 22,
+                            color: AppColors.statusColor(vehicle.status),
+                            tileColor: AppColors.statusColor(
+                              vehicle.status,
+                            ).withValues(alpha: 0.12),
+                          ),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               vehicle.displayName,
@@ -952,20 +1133,27 @@ class _VehicleCard extends StatelessWidget {
                                 fontSize: 36,
                               ),
                             ),
-                          const Spacer(),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                lastUpdatedLabel(vehicle),
-                                style: theme.textTheme.bodySmall,
-                              ),
-                              const SizedBox(height: 2),
-                              Icon(
-                                Icons.chevron_right,
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ],
+                          // The trailing "last updated" label is long
+                          // ("Last update unknown"); let it truncate
+                          // instead of overflowing on narrow screens.
+                          Flexible(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  lastUpdatedLabel(vehicle),
+                                  style: theme.textTheme.bodySmall,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                                const SizedBox(height: 2),
+                                Icon(
+                                  Icons.chevron_right,
+                                  color:
+                                      theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -984,12 +1172,6 @@ class _VehicleCard extends StatelessWidget {
                             Icons.share_outlined,
                             'Share',
                             onShare,
-                          ),
-                          _action(
-                            context,
-                            Icons.assignment_outlined,
-                            'Reports',
-                            onReports,
                           ),
                           _action(
                             context,

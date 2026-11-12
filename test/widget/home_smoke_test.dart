@@ -9,10 +9,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unitrack/models/saved_vehicle.dart';
 import 'package:unitrack/providers/storage_provider.dart';
-import 'package:unitrack/screens/alerts_screen.dart';
-import 'package:unitrack/screens/dashboard_screen.dart';
+import 'package:unitrack/screens/add_vehicle_screen.dart';
+import 'package:unitrack/screens/fleet_list_screen.dart';
 import 'package:unitrack/screens/home_screen.dart';
-import 'package:unitrack/screens/reports_screen.dart';
+import 'package:unitrack/screens/map_screen.dart';
+import 'package:unitrack/screens/settings_screen.dart';
 import 'package:unitrack/services/secure_storage_service.dart';
 import 'package:unitrack/theme/app_theme.dart';
 
@@ -147,43 +148,73 @@ void main() {
       testWidgets('HomeScreen at ${size.width.toInt()}x${size.height.toInt()}',
           (tester) async {
         await _pumpAtSize(tester, size, const HomeScreen());
-        // All five tabs are present in the bottom nav (the matching
-        // screen AppBar titles are built too — IndexedStack).
-        expect(find.text('Dashboard'), findsWidgets);
+        // Exactly four tabs in the bottom nav (Fleet / Map / Add /
+        // Settings) — Dashboard, Reports and Alerts are gone in v1.2.0.
         expect(find.text('Fleet'), findsWidgets);
         expect(find.text('Map'), findsWidgets);
-        expect(find.text('Reports'), findsWidgets);
-        expect(find.text('Alerts'), findsWidgets);
-        // The Dashboard donut + empty state render.
-        expect(find.text('Notifications'), findsOneWidget);
+        expect(find.text('Add'), findsWidgets);
+        expect(find.text('Settings'), findsWidgets);
+        expect(find.text('Dashboard'), findsNothing);
+        expect(find.text('Reports'), findsNothing);
+        expect(find.text('Alerts'), findsNothing);
+        // The fleet empty state renders on the first tab.
+        expect(find.text('No vehicles yet'), findsOneWidget);
       });
     }
   });
 
-  group('new screens smoke test — no overflow', () {
+  group('screens smoke test — no overflow', () {
     for (final size in [const Size(360, 640), const Size(430, 932)]) {
       final label = '${size.width.toInt()}x${size.height.toInt()}';
-      testWidgets('DashboardScreen at $label', (tester) async {
-        await _pumpAtSize(tester, size, const DashboardScreen());
-        expect(find.text('Dashboard'), findsOneWidget);
-        expect(find.text('Moving'), findsOneWidget);
+      testWidgets('FleetListScreen at $label', (tester) async {
+        await _pumpAtSize(tester, size, const FleetListScreen());
+        expect(find.text('UniTrack'), findsOneWidget);
+        expect(find.text('No vehicles yet'), findsOneWidget);
+        // The empty-state button can sit below the fold on a short
+        // screen (the state scrolls) — find it offstage.
+        expect(
+          find.text('Add your first vehicle', skipOffstage: false),
+          findsOneWidget,
+        );
       });
 
-      testWidgets('ReportsScreen at $label', (tester) async {
-        await _pumpAtSize(tester, size, const ReportsScreen());
-        expect(find.text('Reports'), findsOneWidget);
-        expect(find.text('Today'), findsOneWidget);
-        expect(find.text('Yesterday'), findsOneWidget);
+      testWidgets('MapScreen at $label', (tester) async {
+        await _pumpAtSize(tester, size, const MapScreen());
+        expect(find.text('Map'), findsOneWidget);
+        expect(find.text('No vehicles on the map yet'), findsOneWidget);
       });
 
-      testWidgets('AlertsScreen at $label', (tester) async {
-        await _pumpAtSize(tester, size, const AlertsScreen());
-        expect(find.text('Alerts'), findsOneWidget);
-        expect(find.text('All (0)'), findsOneWidget);
-        expect(find.text('Overspeed (0)'), findsOneWidget);
-        expect(find.text('Geofence (0)'), findsOneWidget);
-        // No SOS chip anywhere — no provider reports SOS.
-        expect(find.text('SOS'), findsNothing);
+      testWidgets('AddVehicleScreen at $label', (tester) async {
+        await _pumpAtSize(tester, size, const AddVehicleScreen());
+        expect(find.text('Add vehicle'), findsOneWidget);
+        expect(find.text('Provider'), findsWidgets);
+        // Vehicle-type picker on the credentials step is reachable
+        // from step 1 — the chips exist in the widget tree.
+        await tester.tap(find.text('Continue'));
+        await tester.pumpAndSettle();
+        expect(find.text('Vehicle type'), findsOneWidget);
+        expect(find.text('Bus'), findsOneWidget);
+        expect(find.text('Car'), findsOneWidget);
+        expect(find.text('Truck'), findsOneWidget);
+        expect(find.text('Bike'), findsOneWidget);
+        expect(find.text('Other'), findsOneWidget);
+      });
+
+      testWidgets('SettingsScreen at $label', (tester) async {
+        await _pumpAtSize(tester, size, const SettingsScreen());
+        expect(find.text('Settings'), findsOneWidget);
+        expect(find.text('Backup & restore'), findsOneWidget);
+        // The About card sits below the fold in a ListView — scroll
+        // it into view; offscreen ListView children are not built.
+        await tester.scrollUntilVisible(
+          find.text('Version 1.2.0 (build 11)'),
+          200,
+        );
+        expect(find.text('Version 1.2.0 (build 11)'), findsOneWidget);
+        // No Alerts section any more — notifications don't arrive
+        // on the user's phone, so the app dropped them in v1.2.0.
+        expect(find.text('Alerts'), findsNothing);
+        expect(find.text('Overspeed limit'), findsNothing);
       });
     }
   });

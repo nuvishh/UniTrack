@@ -4,11 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../models/vehicle.dart';
-import '../providers/geofences_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/tracker_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
+import '../widgets/vehicle_category_icon.dart';
 import '../widgets/vehicle_status_chip.dart';
 import 'add_vehicle_screen.dart';
 import 'vehicle_detail_screen.dart';
@@ -16,8 +16,9 @@ import 'vehicle_detail_screen.dart';
 /// Map view: all vehicles with a fix, on OpenStreetMap tiles
 /// (flutter_map — no Google Maps API key needed).
 ///
-/// Markers carry the vehicle's reg no on a status-coloured pin; tapping
-/// one opens a bottom sheet with the key facts and a link to details.
+/// Markers carry the vehicle's reg no on a status-coloured pin with
+/// the vehicle-type icon inside; tapping one opens a bottom sheet
+/// with the key facts and a link to details.
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
@@ -79,7 +80,24 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ],
               ),
               const SizedBox(height: 10),
-              ProviderBadge(providerKey: vehicle.providerKey),
+              Row(
+                children: [
+                  ProviderBadge(providerKey: vehicle.providerKey),
+                  const SizedBox(width: 8),
+                  VehicleCategoryIcon(
+                    category: vehicle.category,
+                    size: 18,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    vehicle.category.label,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 14),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -188,11 +206,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final vehicles = ref.watch(trackerProvider.select((s) => s.vehicles));
-    final geofences = ref.watch(geofencesProvider);
-    // Cross-tab focus: a fleet card's "Map" action or an alert's
-    // "View on Map" asks for a vehicle; centre on it once, then
-    // clear the request. If the vehicle is not in the fleet yet, the
-    // request stays pending until the next fleet update.
+    // Cross-tab focus: a fleet card's "Map" action asks for a
+    // vehicle; centre on it once, then clear the request. If the
+    // vehicle is not in the fleet yet, the request stays pending
+    // until the next fleet update.
     ref.listen(homeNavProvider.select((s) => s.mapVehicleKey), (_, key) {
       if (key == null) return;
       final match = vehicles.where(
@@ -231,27 +248,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.nuvish.unitrack',
               ),
-              if (geofences.isNotEmpty)
-                CircleLayer(
-                  circles: geofences
-                      .map(
-                        (fence) => CircleMarker(
-                          point: LatLng(fence.latitude, fence.longitude),
-                          radius: fence.radiusM,
-                          useRadiusInMeter: true,
-                          color: AppColors.sky.withValues(alpha: 0.12),
-                          borderColor: AppColors.sky.withValues(alpha: 0.6),
-                          borderStrokeWidth: 2,
-                        ),
-                      )
-                      .toList(),
-                ),
               MarkerLayer(
                 markers: withFix.map((vehicle) {
                   return Marker(
                     point: LatLng(vehicle.latitude!, vehicle.longitude!),
                     width: 120,
-                    height: 64,
+                    height: 72,
                     child: GestureDetector(
                       onTap: () => _showVehicleSheet(vehicle),
                       child: Column(
@@ -287,10 +289,29 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                               ),
                             ),
                           ),
-                          Icon(
-                            Icons.location_on,
-                            color: AppColors.statusColor(vehicle.status),
-                            size: 32,
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.statusColor(vehicle.status),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.25),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              vehicle.category.icon,
+                              color: Colors.white,
+                              size: 22,
+                            ),
                           ),
                         ],
                       ),
@@ -300,11 +321,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
             ],
           ),
-          // Live count chip.
+          // Live count chip. The label truncates instead of
+          // overflowing on narrow screens / large system fonts.
           Positioned(
             top: 12,
-            left: 0,
-            right: 0,
+            left: 16,
+            right: 16,
             child: Center(
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -327,12 +349,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   children: [
                     PulsingDot(color: AppColors.live, pulsing: liveCount > 0),
                     const SizedBox(width: 8),
-                    Text(
-                      '$liveCount live · $idleCount idle · '
-                      '${vehicles.length} total',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
+                    Flexible(
+                      child: Text(
+                        '$liveCount live · $idleCount idle · '
+                        '${vehicles.length} total',
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   ],
