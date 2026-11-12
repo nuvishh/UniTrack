@@ -4,9 +4,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/gps_provider.dart';
 import '../models/provider_credentials.dart';
+import '../models/provider_descriptor.dart';
 import '../models/saved_vehicle.dart';
+import '../providers/registry_provider.dart';
 import '../providers/storage_provider.dart';
 import '../services/providers/gps_provider_client.dart';
 import '../services/providers/provider_client_factory.dart';
@@ -38,7 +39,10 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
   final _displayNameController = TextEditingController();
 
   int _step = 0;
-  GpsProvider _provider = GpsProvider.aargee;
+
+  /// Selected provider, by key. Resolved to a [ProviderDescriptor]
+  /// via [_descriptor] — built-ins and registry-added providers alike.
+  String _providerKey = 'aargee';
   bool _secretVisible = false;
   bool _testedOk = false;
   bool _saving = false;
@@ -53,6 +57,14 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
     _regNoController.dispose();
     _displayNameController.dispose();
     super.dispose();
+  }
+
+  ProviderDescriptor get _descriptor {
+    final descriptors = ref.read(providerDescriptorsProvider);
+    return descriptors.firstWhere(
+      (d) => d.key == _providerKey,
+      orElse: () => descriptors.first,
+    );
   }
 
   ProviderCredentials get _credentials => ProviderCredentials(
@@ -75,9 +87,9 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
     });
   }
 
-  void _selectProvider(GpsProvider provider) {
+  void _selectProvider(String key) {
     setState(() {
-      _provider = provider;
+      _providerKey = key;
       _testedOk = false;
       _testState = _TestState.idle;
       _testMessage = null;
@@ -100,7 +112,10 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
       _testMessage = null;
     });
     try {
-      final client = clientFor(_provider);
+      final client = clientForSavedVehicle(
+        _providerKey,
+        ref.read(registryProvider).registry,
+      );
       final vehicles = await client.fetchLiveVehicles(_credentials);
       if (!mounted) return;
       if (vehicles.isEmpty) {
@@ -149,7 +164,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
       setState(() {
         _testState = _TestState.error;
         _testMessage =
-            'Could not reach ${_provider.displayName} — check your '
+            'Could not reach ${_descriptor.displayName} — check your '
             'internet connection and try again.';
       });
     } on FormatException {
@@ -175,7 +190,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
     try {
       final vehicle = SavedVehicle(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        providerKey: _provider.key,
+        providerKey: _providerKey,
         deviceId: _deviceIdController.text.trim(),
         regNo: _regNoController.text.trim().isEmpty
             ? null
@@ -194,14 +209,16 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
     }
   }
 
-  String _authDescription(AuthType type) {
-    switch (type) {
-      case AuthType.apiKey:
+  String _authDescription(String authKind) {
+    switch (authKind) {
+      case 'apiKey':
         return 'Signs in with one API key';
-      case AuthType.userIdAndKey:
+      case 'userIdAndKey':
         return 'Signs in with a user ID + key';
-      case AuthType.usernamePassword:
+      case 'usernamePassword':
         return 'Signs in with username + password';
+      default:
+        return 'Signs in with its own credentials';
     }
   }
 
@@ -351,6 +368,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
 
   Widget _buildProviderStep() {
     final theme = Theme.of(context);
+    final descriptors = ref.watch(providerDescriptorsProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -367,9 +385,9 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        ...GpsProvider.values.map((provider) {
-          final selected = provider == _provider;
-          final color = AppColors.providerColor(provider.key);
+        ...descriptors.map((descriptor) {
+          final selected = descriptor.key == _providerKey;
+          final color = AppColors.providerColor(descriptor.key);
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Card(
@@ -381,7 +399,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                 ),
               ),
               child: InkWell(
-                onTap: () => _selectProvider(provider),
+                onTap: () => _selectProvider(descriptor.key),
                 borderRadius: BorderRadius.circular(AppTheme.cardRadius),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -409,19 +427,44 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    provider.displayName,
+                                    descriptor.displayName,
                                     style: theme.textTheme.titleMedium,
                                   ),
                                 ),
-                                ProviderStatusPill(provider: provider),
+                                // Registry-added providers carry a
+                                // "Remote" badge so they stand apart
+                                // from the 7 built-ins.
+                                if (descriptor.isRemote)
+                                  Container(
+                                    margin: const EdgeInsets.only(right: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.sky.withValues(
+                                        alpha: 0.16,
+                                      ),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: const Text(
+                                      'Remote',
+                                      style: TextStyle(
+                                        color: AppColors.sky,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                                ProviderStatusPill(descriptor: descriptor),
                               ],
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _authDescription(provider.authType),
+                              _authDescription(descriptor.authKind),
                               style: theme.textTheme.bodySmall,
                             ),
-                            if (provider.supportsHistory)
+                            if (descriptor.supportsHistory)
                               Text(
                                 'Live tracking + history',
                                 style: theme.textTheme.bodySmall,
@@ -456,11 +499,12 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
 
   Widget _buildDetailsStep() {
     final theme = Theme.of(context);
+    final descriptor = _descriptor;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Enter ${_provider.displayName} credentials',
+          'Enter ${descriptor.displayName} credentials',
           style: theme.textTheme.titleLarge,
         ),
         const SizedBox(height: 6),
@@ -471,7 +515,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        if (!_provider.verified)
+        if (!descriptor.verified)
           Card(
             color: AppColors.idle.withValues(alpha: 0.12),
             child: Padding(
@@ -486,7 +530,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '${_provider.displayName} is not verified yet — '
+                      '${descriptor.displayName} is not verified yet — '
                       'its endpoint paths are not confirmed. Test '
                       'connection will explain what is missing.',
                       style: theme.textTheme.bodyMedium,
@@ -497,13 +541,13 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
             ),
           )
         else
-          Text(_provider.rateLimitNote, style: theme.textTheme.bodySmall),
+          Text(descriptor.rateLimitNote, style: theme.textTheme.bodySmall),
         const SizedBox(height: 16),
         TextFormField(
           controller: _deviceIdController,
           decoration: InputDecoration(
-            labelText: _provider.deviceIdLabel,
-            hintText: _provider.deviceIdHint,
+            labelText: descriptor.deviceIdLabel,
+            hintText: descriptor.deviceIdHint,
             helperText: 'This identifies the vehicle at the provider.',
           ),
           validator: (value) =>
@@ -517,8 +561,8 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
           controller: _secretController,
           obscureText: !_secretVisible,
           decoration: InputDecoration(
-            labelText: _provider.secretLabel,
-            hintText: _provider.secretHint,
+            labelText: descriptor.secretLabel,
+            hintText: descriptor.secretHint,
             helperText: 'Never shared — stored only on this device.',
             suffixIcon: IconButton(
               icon: Icon(
@@ -559,6 +603,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
 
   Widget _buildTestStep() {
     final theme = Theme.of(context);
+    final descriptor = _descriptor;
     final deviceId = _deviceIdController.text.trim();
     final regNo = _regNoController.text.trim();
     return Column(
@@ -567,7 +612,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
         Text('Test the connection', style: theme.textTheme.titleLarge),
         const SizedBox(height: 6),
         Text(
-          'We\'ll contact ${_provider.displayName} with these credentials '
+          'We\'ll contact ${descriptor.displayName} with these credentials '
           'before saving anything.',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -581,11 +626,11 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
               children: [
                 Row(
                   children: [
-                    ProviderBadge(providerKey: _provider.key),
+                    ProviderBadge(providerKey: descriptor.key),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        _provider.displayName,
+                        descriptor.displayName,
                         style: theme.textTheme.titleMedium,
                       ),
                     ),
@@ -700,7 +745,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                         const SizedBox(height: 2),
                         Text(
                           '$_testCount vehicle${_testCount == 1 ? '' : 's'} '
-                          'found on ${_provider.displayName}.',
+                          'found on ${descriptor.displayName}.',
                           style: theme.textTheme.bodyMedium,
                         ),
                       ],

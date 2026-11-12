@@ -4,8 +4,10 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../models/gps_provider.dart';
+import '../models/geofence.dart';
 import '../models/vehicle.dart';
+import '../providers/geofences_provider.dart';
+import '../providers/registry_provider.dart';
 import '../providers/tracker_provider.dart';
 import '../services/providers/gps_provider_client.dart';
 import '../theme/app_theme.dart';
@@ -115,8 +117,6 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
   String? _historyError;
   bool _loadingHistory = false;
 
-  GpsProvider get _provider => GpsProvider.fromKey(widget.vehicle.providerKey);
-
   Future<void> _loadHistory() async {
     setState(() {
       _loadingHistory = true;
@@ -197,6 +197,18 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final vehicle = widget.vehicle;
+    // Descriptor-aware provider info (works for registry-added
+    // providers too — GpsProvider.fromKey would throw for them).
+    final descriptors = ref.watch(providerDescriptorsProvider);
+    final descriptor = descriptors.where(
+      (d) => d.key == vehicle.providerKey,
+    );
+    final providerName = descriptor.isEmpty
+        ? vehicle.providerKey
+        : descriptor.first.displayName;
+    final supportsHistory = descriptor.isEmpty
+        ? false
+        : descriptor.first.supportsHistory;
     final statusColor = AppColors.statusColor(vehicle.status);
     final statusLabel = switch (vehicle.status) {
       VehicleStatus.live => 'LIVE',
@@ -343,7 +355,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                   _infoRow(
                     Icons.business_outlined,
                     'Provider',
-                    _provider.displayName,
+                    providerName,
                   ),
                   _infoRow(Icons.tag_outlined, 'Reg no', vehicle.displayName),
                   if (vehicle.imei != null)
@@ -381,7 +393,11 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          if (!_provider.supportsHistory)
+          // Geofences for this vehicle (alerts on enter/exit).
+          const SectionHeader(title: 'Geofences'),
+          _GeofenceSection(vehicle: vehicle),
+          const SizedBox(height: 20),
+          if (!supportsHistory)
             Card(
               color: AppColors.idle.withValues(alpha: 0.12),
               child: Padding(
@@ -398,7 +414,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                     Expanded(
                       child: Text(
                         'History is not supported by '
-                        '${_provider.displayName} — it returns live '
+                        '$providerName — it returns live '
                         'snapshots only.',
                         style: theme.textTheme.bodyMedium,
                       ),
@@ -482,6 +498,154 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Geofences watching this vehicle: list + "Add geofence here"
+/// (centred on the vehicle's current position, radius chosen in a
+/// dialog). Enter/exit crossings become Alerts.
+class _GeofenceSection extends ConsumerWidget {
+  const _GeofenceSection({required this.vehicle});
+
+  final Vehicle vehicle;
+
+  Future<void> _add(BuildContext context, WidgetRef ref) async {
+    if (!vehicle.hasFix) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No live location yet — wait for a fix first.'),
+        ),
+      );
+      return;
+    }
+    final radius = await showDialog<double>(
+      context: context,
+      builder: (context) => const _RadiusDialog(),
+    );
+    if (radius == null || !context.mounted) return;
+    final fence = Geofence(
+      id: '${DateTime.now().millisecondsSinceEpoch}',
+      vehicleKey: '${vehicle.providerKey}:${vehicle.id}',
+      name: vehicle.displayName,
+      latitude: vehicle.latitude!,
+      longitude: vehicle.longitude!,
+      radiusM: radius,
+    );
+    await ref.read(geofencesProvider.notifier).add(fence);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Geofence added — ${fence.radiusLabel} around '
+            '${vehicle.displayName}.',
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final key = '${vehicle.providerKey}:${vehicle.id}';
+    final fences = ref
+        .watch(geofencesProvider)
+        .where((f) => f.vehicleKey == key)
+        .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (fences.isEmpty)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'No geofences for this vehicle yet. Add one to get an '
+                'alert when it enters or leaves the area.',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          )
+        else
+          ...fences.map(
+            (fence) => Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: const Icon(Icons.place_outlined),
+                title: Text(fence.name),
+                subtitle: Text(
+                  '${fence.radiusLabel} · '
+                  '${fence.latitude.toStringAsFixed(5)}, '
+                  '${fence.longitude.toStringAsFixed(5)}',
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  tooltip: 'Remove geofence',
+                  onPressed: () => ref
+                      .read(geofencesProvider.notifier)
+                      .remove(fence.id),
+                ),
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: vehicle.hasFix ? () => _add(context, ref) : null,
+          icon: const Icon(Icons.add_location_alt_outlined),
+          label: const Text('Add geofence here'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Radius picker for a new geofence.
+class _RadiusDialog extends StatefulWidget {
+  const _RadiusDialog();
+
+  @override
+  State<_RadiusDialog> createState() => _RadiusDialogState();
+}
+
+class _RadiusDialogState extends State<_RadiusDialog> {
+  double _radius = 250;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Geofence radius'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'The geofence is centred on the vehicle\'s current location.',
+          ),
+          const SizedBox(height: 16),
+          SegmentedButton<double>(
+            segments: const [
+              ButtonSegment(value: 100, label: Text('100 m')),
+              ButtonSegment(value: 250, label: Text('250 m')),
+              ButtonSegment(value: 500, label: Text('500 m')),
+              ButtonSegment(value: 1000, label: Text('1 km')),
+            ],
+            selected: {_radius},
+            onSelectionChanged: (selected) =>
+                setState(() => _radius = selected.first),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_radius),
+          child: const Text('Add'),
+        ),
+      ],
     );
   }
 }

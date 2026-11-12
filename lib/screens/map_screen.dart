@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../models/vehicle.dart';
+import '../providers/geofences_provider.dart';
+import '../providers/navigation_provider.dart';
 import '../providers/tracker_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
@@ -186,6 +188,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final vehicles = ref.watch(trackerProvider.select((s) => s.vehicles));
+    final geofences = ref.watch(geofencesProvider);
+    // Cross-tab focus: a fleet card's "Map" action or an alert's
+    // "View on Map" asks for a vehicle; centre on it once, then
+    // clear the request. If the vehicle is not in the fleet yet, the
+    // request stays pending until the next fleet update.
+    ref.listen(homeNavProvider.select((s) => s.mapVehicleKey), (_, key) {
+      if (key == null) return;
+      final match = vehicles.where(
+        (v) => '${v.providerKey}:${v.id}' == key,
+      );
+      if (match.isEmpty || !match.first.hasFix) return;
+      _mapController.move(
+        LatLng(match.first.latitude!, match.first.longitude!),
+        14,
+      );
+      ref.read(homeNavProvider.notifier).clearMapFocus();
+    });
     final withFix = vehicles.where((v) => v.hasFix).toList();
     final center = withFix.isNotEmpty
         ? LatLng(withFix.first.latitude!, withFix.first.longitude!)
@@ -212,6 +231,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.nuvish.unitrack',
               ),
+              if (geofences.isNotEmpty)
+                CircleLayer(
+                  circles: geofences
+                      .map(
+                        (fence) => CircleMarker(
+                          point: LatLng(fence.latitude, fence.longitude),
+                          radius: fence.radiusM,
+                          useRadiusInMeter: true,
+                          color: AppColors.sky.withValues(alpha: 0.12),
+                          borderColor: AppColors.sky.withValues(alpha: 0.6),
+                          borderStrokeWidth: 2,
+                        ),
+                      )
+                      .toList(),
+                ),
               MarkerLayer(
                 markers: withFix.map((vehicle) {
                   return Marker(

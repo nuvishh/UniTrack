@@ -1,10 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import '../models/gps_provider.dart';
+import '../models/provider_descriptor.dart';
 import '../models/vehicle.dart';
+import '../providers/navigation_provider.dart';
+import '../providers/registry_provider.dart';
 import '../providers/tracker_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_format.dart';
@@ -33,6 +38,12 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
   String _searchQuery = '';
   String _selectedProviderKey = 'all';
   Set<VehicleStatus>? _selectedStatuses;
+
+  /// Narrows a LIVE selection further by motion: true = moving
+  /// (speed above 5 km/h), false = idle (ignition on, not moving).
+  /// Null means "don't narrow". The status chips and the summary
+  /// strip both write these two fields.
+  bool? _movingOnly;
   DateTime? _lastRefreshed;
   bool _wasRefreshing = false;
   Timer? _labelTimer;
@@ -77,20 +88,37 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
     );
   }
 
-  List<Vehicle> _filtered(List<Vehicle> vehicles) {
-    var list = vehicles;
+  List<Vehicle> _filtered(
+    List<Vehicle> vehicles,
+    Map<String, ProviderDescriptor> descriptors,
+  ) {
+    // Copy first: the fleet list may be the state's const [] (or any
+    // other unmodifiable list) and the sort below mutates in place.
+    var list = List<Vehicle>.from(vehicles);
     if (_selectedProviderKey != 'all') {
       list = list.where((v) => v.providerKey == _selectedProviderKey).toList();
     }
     if (_selectedStatuses != null) {
       list = list.where((v) => _selectedStatuses!.contains(v.status)).toList();
     }
+    if (_movingOnly != null) {
+      final moving = _movingOnly!;
+      list = list
+          .where(
+            (v) =>
+                v.status == VehicleStatus.live &&
+                (((v.speedKmph ?? 0) > 5) == moving),
+          )
+          .toList();
+    }
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
       list = list.where((v) {
-        final providerName = GpsProvider.fromKey(v.providerKey).displayName
-            .toLowerCase();
+        final providerName =
+            descriptors[v.providerKey]?.displayName.toLowerCase() ??
+            v.providerKey;
         return v.displayName.toLowerCase().contains(q) ||
+            (v.imei?.toLowerCase().contains(q) ?? false) ||
             providerName.contains(q);
       }).toList();
     }
@@ -115,7 +143,11 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
     final vehicles = trackerState.vehicles;
     final isRefreshing = trackerState.isRefreshing;
     final error = trackerState.lastError;
-    final filtered = _filtered(vehicles);
+    final descriptors = ref.watch(providerDescriptorsProvider);
+    final descriptorByKey = {
+      for (final d in descriptors) d.key: d,
+    };
+    final filtered = _filtered(vehicles, descriptorByKey);
     final liveCount = vehicles
         .where((v) => v.status == VehicleStatus.live)
         .length;
@@ -123,6 +155,13 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
         .where((v) => v.status == VehicleStatus.idle)
         .length;
     final offlineCount = vehicles.length - liveCount - idleCount;
+    final movingCount = vehicles
+        .where(
+          (v) =>
+              v.status == VehicleStatus.live && (v.speedKmph ?? 0) > 5,
+        )
+        .length;
+    final idleMovingCount = liveCount - movingCount;
 
     return Scaffold(
       appBar: AppBar(
@@ -162,6 +201,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
                   _selectedStatuses!.length == statuses.length &&
                   _selectedStatuses!.containsAll(statuses);
               _selectedStatuses = same ? null : statuses;
+              _movingOnly = null;
             }),
           ),
           Padding(
@@ -169,7 +209,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search by reg no or provider',
+                hintText: 'Search by reg no, IMEI or provider',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchQuery.isEmpty
                     ? null
@@ -188,8 +228,22 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
           if (vehicles.isNotEmpty)
             _ProviderFilterChips(
               vehicles: vehicles,
+              descriptors: descriptorByKey,
               selectedKey: _selectedProviderKey,
               onSelected: (key) => setState(() => _selectedProviderKey = key),
+            ),
+          if (vehicles.isNotEmpty)
+            _StatusFilterChips(
+              total: vehicles.length,
+              moving: movingCount,
+              idle: idleMovingCount,
+              stopped: idleCount,
+              selectedStatuses: _selectedStatuses,
+              movingOnly: _movingOnly,
+              onSelect: (statuses, movingOnly) => setState(() {
+                _selectedStatuses = statuses;
+                _movingOnly = movingOnly;
+              }),
             ),
           if (error != null && vehicles.isNotEmpty)
             Padding(
@@ -263,6 +317,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
             _searchQuery = '';
             _selectedProviderKey = 'all';
             _selectedStatuses = null;
+            _movingOnly = null;
           });
         },
       );
@@ -274,16 +329,75 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
         itemCount: filtered.length,
         itemBuilder: (context, index) {
+          final vehicle = filtered[index];
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: _VehicleCard(
-              vehicle: filtered[index],
-              onTap: () => _openDetail(filtered[index]),
+              vehicle: vehicle,
+              onTap: () => _openDetail(vehicle),
+              onNavigate: () => _navigate(vehicle),
+              onShare: () => _share(vehicle),
+              onReports: () => _openReports(vehicle),
+              onMap: () => _openOnMap(vehicle),
             ),
           );
         },
       ),
     );
+  }
+
+  /// Opens Google Maps directions to the vehicle; falls back to the
+  /// in-app map when the vehicle has no fix or Maps won't open.
+  Future<void> _navigate(Vehicle vehicle) async {
+    if (!vehicle.hasFix) {
+      _openOnMap(vehicle);
+      return;
+    }
+    final uri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1'
+      '&destination=${vehicle.latitude},${vehicle.longitude}',
+    );
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened && mounted) {
+      _openOnMap(vehicle);
+    }
+  }
+
+  /// Shares the vehicle's live position as text (reg, status, speed,
+  /// Google Maps link). Falls back to copying the text when the share
+  /// sheet is unavailable.
+  Future<void> _share(Vehicle vehicle) async {
+    final location = vehicle.hasFix
+        ? 'https://maps.google.com/?q=${vehicle.latitude},${vehicle.longitude}'
+        : 'No location yet';
+    final text =
+        '${vehicle.displayName} — ${vehicle.status.name.toUpperCase()}, '
+        '${vehicle.speedKmph == null ? 'speed unknown' : '${vehicle.speedKmph!.toStringAsFixed(0)} km/h'}. '
+        '${lastUpdatedLabel(vehicle)}. Location: $location';
+    try {
+      await SharePlus.instance.share(ShareParams(text: text));
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Share unavailable — copied instead.')),
+      );
+    }
+  }
+
+  void _openReports(Vehicle vehicle) {
+    ref
+        .read(homeNavProvider.notifier)
+        .openReportsFor('${vehicle.providerKey}:${vehicle.id}');
+  }
+
+  void _openOnMap(Vehicle vehicle) {
+    ref
+        .read(homeNavProvider.notifier)
+        .focusVehicleOnMap('${vehicle.providerKey}:${vehicle.id}');
   }
 }
 
@@ -480,11 +594,13 @@ class _SummaryStrip extends StatelessWidget {
 class _ProviderFilterChips extends StatelessWidget {
   const _ProviderFilterChips({
     required this.vehicles,
+    required this.descriptors,
     required this.selectedKey,
     required this.onSelected,
   });
 
   final List<Vehicle> vehicles;
+  final Map<String, ProviderDescriptor> descriptors;
   final String selectedKey;
   final void Function(String key) onSelected;
 
@@ -504,7 +620,7 @@ class _ProviderFilterChips extends StatelessWidget {
           final selected = key == selectedKey;
           final label = key == 'all'
               ? 'All (${vehicles.length})'
-              : '${GpsProvider.fromKey(key).displayName} (${counts[key]})';
+              : '${descriptors[key]?.displayName ?? key} (${counts[key]})';
           final color = key == 'all'
               ? theme.colorScheme.primary
               : AppColors.providerColor(key);
@@ -537,6 +653,105 @@ class _ProviderFilterChips extends StatelessWidget {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+/// Status filter chips, Volty-style: All / Moving / Idle / Stopped,
+/// with counts. They write the same filter state as the tappable
+/// summary strip above (Moving = live + speed above 5 km/h, Idle =
+/// live + not moving, Stopped = ignition off).
+class _StatusFilterChips extends StatelessWidget {
+  const _StatusFilterChips({
+    required this.total,
+    required this.moving,
+    required this.idle,
+    required this.stopped,
+    required this.selectedStatuses,
+    required this.movingOnly,
+    required this.onSelect,
+  });
+
+  final int total;
+  final int moving;
+  final int idle;
+  final int stopped;
+  final Set<VehicleStatus>? selectedStatuses;
+  final bool? movingOnly;
+  final void Function(Set<VehicleStatus>? statuses, bool? movingOnly)
+  onSelect;
+
+  bool get _allSelected => selectedStatuses == null && movingOnly == null;
+
+  bool _isSelected(Set<VehicleStatus> statuses, bool? moving) {
+    return selectedStatuses != null &&
+        selectedStatuses!.length == statuses.length &&
+        selectedStatuses!.containsAll(statuses) &&
+        movingOnly == moving;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    Widget chip(
+      String label,
+      int count,
+      bool selected,
+      VoidCallback onTap,
+    ) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: selected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              '$label ($count)',
+              style: TextStyle(
+                color: selected
+                    ? Colors.white
+                    : theme.colorScheme.onSurface,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        children: [
+          chip('All', total, _allSelected, () => onSelect(null, null)),
+          chip(
+            'Moving',
+            moving,
+            _isSelected({VehicleStatus.live}, true),
+            () => onSelect({VehicleStatus.live}, true),
+          ),
+          chip(
+            'Idle',
+            idle,
+            _isSelected({VehicleStatus.live}, false),
+            () => onSelect({VehicleStatus.live}, false),
+          ),
+          chip(
+            'Stopped',
+            stopped,
+            _isSelected({VehicleStatus.idle}, null),
+            () => onSelect({VehicleStatus.idle}, null),
+          ),
+        ],
       ),
     );
   }
@@ -579,12 +794,68 @@ class _InlineErrorBanner extends StatelessWidget {
 }
 
 /// One vehicle, big and readable: reg no, status pill, provider badge,
-/// ignition, large speed and relative update time.
+/// ignition, large speed and relative update time — plus the four
+/// Volty-style actions: Navigate / Share / Reports / Map.
 class _VehicleCard extends StatelessWidget {
-  const _VehicleCard({required this.vehicle, required this.onTap});
+  const _VehicleCard({
+    required this.vehicle,
+    required this.onTap,
+    required this.onNavigate,
+    required this.onShare,
+    required this.onReports,
+    required this.onMap,
+  });
 
   final Vehicle vehicle;
   final VoidCallback onTap;
+  final VoidCallback onNavigate;
+  final VoidCallback onShare;
+  final VoidCallback onReports;
+  final VoidCallback onMap;
+
+  Widget _action(
+    BuildContext context,
+    IconData icon,
+    String label,
+    VoidCallback onPressed,
+  ) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: theme.colorScheme.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -695,6 +966,36 @@ class _VehicleCard extends StatelessWidget {
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
                             ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1),
+                      Row(
+                        children: [
+                          _action(
+                            context,
+                            Icons.navigation_outlined,
+                            'Navigate',
+                            onNavigate,
+                          ),
+                          _action(
+                            context,
+                            Icons.share_outlined,
+                            'Share',
+                            onShare,
+                          ),
+                          _action(
+                            context,
+                            Icons.assignment_outlined,
+                            'Reports',
+                            onReports,
+                          ),
+                          _action(
+                            context,
+                            Icons.map_outlined,
+                            'Map',
+                            onMap,
                           ),
                         ],
                       ),

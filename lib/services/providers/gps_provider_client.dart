@@ -22,11 +22,23 @@ class ProviderException implements Exception {
 /// optional [http.Client] can be injected (used by tests). When no client
 /// is passed, the implementation creates and closes its own.
 abstract class GpsProviderClient {
-  GpsProvider get provider;
+  /// The built-in provider this client serves, or null for a remote
+  /// (registry-driven) client, which has no enum entry. Built-in
+  /// clients override this; remote clients override [providerKey],
+  /// [providerDisplayName], [supportsHistory] and
+  /// [minimumPollInterval] instead.
+  GpsProvider? get provider => null;
 
-  bool get supportsHistory => provider.supportsHistory;
+  /// Lowercase key, e.g. 'aargee'.
+  String get providerKey => provider!.key;
 
-  Duration get minimumPollInterval => provider.minPollInterval;
+  /// Display name, e.g. 'Aargee GPS'.
+  String get providerDisplayName => provider!.displayName;
+
+  bool get supportsHistory => provider?.supportsHistory ?? false;
+
+  Duration get minimumPollInterval =>
+      provider?.minPollInterval ?? const Duration(seconds: 60);
 
   /// Fetches the latest live snapshot for the account in [credentials].
   /// Returns every vehicle visible to that account (a fleet call where
@@ -47,7 +59,7 @@ abstract class GpsProviderClient {
     http.Client? httpClient,
   }) {
     throw UnsupportedError(
-      '${provider.displayName} does not support history — '
+      '$providerDisplayName does not support history — '
       'it returns live snapshots only.',
     );
   }

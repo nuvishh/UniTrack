@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/vehicle.dart';
 import '../services/tracker_service.dart';
+import 'registry_provider.dart';
 import 'storage_provider.dart';
 
 /// Immutable snapshot of the fleet's live state.
@@ -65,6 +66,11 @@ class TrackerNotifier extends Notifier<TrackerState> {
     _service.vehicles.addListener(_syncFromService);
     _service.isRefreshing.addListener(_syncFromService);
     _service.lastError.addListener(_syncFromService);
+    // The downloaded registry (when one arrives) lets the service
+    // poll registry-added providers too; built-ins are unaffected.
+    ref.listen(registryProvider, (_, next) {
+      _service.registry = next.registry;
+    });
     ref.onDispose(() {
       _disposed = true;
       _service.vehicles.removeListener(_syncFromService);

@@ -32,3 +32,37 @@ String relativeUpdatedLabel(Vehicle vehicle) {
   if (vehicle.lastUpdatedRaw.isEmpty) return 'Last update unknown';
   return 'Updated ${vehicle.lastUpdatedRaw}';
 }
+
+const _months = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/// Absolute alert time, Volty-style: "Nov 12, 9:59 AM".
+String formatAlertTime(DateTime when) {
+  final hour12 = when.hour % 12 == 0 ? 12 : when.hour % 12;
+  final amPm = when.hour < 12 ? 'AM' : 'PM';
+  final minute = when.minute.toString().padLeft(2, '0');
+  return '${_months[when.month - 1]} ${when.day}, $hour12:$minute $amPm';
+}
+
+/// Short day label: "Today", "Yesterday", or "Nov 12".
+String dayLabel(DateTime day, {DateTime? now}) {
+  final today = now ?? DateTime.now();
+  final todayStart = DateTime(today.year, today.month, today.day);
+  final dayStart = DateTime(day.year, day.month, day.day);
+  final diff = dayStart.difference(todayStart).inDays;
+  if (diff == 0) return 'Today';
+  if (diff == -1) return 'Yesterday';
+  return '${_months[day.month - 1]} ${day.day}';
+}

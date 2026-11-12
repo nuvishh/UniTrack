@@ -1,0 +1,432 @@
+{
+  "providers": [
+    {
+      "auth": {
+        "bodyField": "apikey",
+        "secretFormat": "key",
+        "style": "body"
+      },
+      "authKind": "apiKey",
+      "baseUrl": "https://compass.transight.in/external/api/v2",
+      "deviceIdHint": "IMEI or vehicle ID",
+      "deviceIdLabel": "IMEI / Vehicle ID",
+      "deviceMatching": "strict",
+      "displayName": "Transight",
+      "fields": {
+        "displayName": "vehicle",
+        "falseValues": [
+          "off",
+          "false",
+          "0"
+        ],
+        "id": "vehicle",
+        "ignition": "ignition",
+        "imei": "imei",
+        "lastUpdated": "time",
+        "latitude": "lat",
+        "longitude": "lon",
+        "speed": "speed",
+        "trueValues": [
+          "on",
+          "true",
+          "1"
+        ]
+      },
+      "fleet": {
+        "body": {
+          "apikey": "{secret}",
+          "split_latlng": "True"
+        },
+        "method": "POST",
+        "path": "/get_all_vehicles_last_data/"
+      },
+      "genericCompatible": true,
+      "history": {
+        "body": {
+          "apikey": "{secret}",
+          "fromdate": "{from}",
+          "todate": "{to}",
+          "vehicle_id": "{deviceId}"
+        },
+        "method": "POST",
+        "path": "/get_vehicle_details/"
+      },
+      "historyDeviceParam": {
+        "imeiParam": "imei",
+        "vehicleIdParam": "vehicle_id"
+      },
+      "key": "transight",
+      "listPath": "data",
+      "locationField": "location",
+      "minPollIntervalSeconds": 60,
+      "overrideBuiltin": false,
+      "rateLimitNote": "Rate limits: 100/day fleet list, 500/day last data, 10/day history per vehicle.",
+      "secretHint": "Your Transight API key",
+      "secretLabel": "API Key",
+      "successCheck": {
+        "equals": 1,
+        "field": "status"
+      },
+      "supportsHistory": true,
+      "timeoutSeconds": 30,
+      "verified": true
+    },
+    {
+      "auth": {
+        "bodyField": "apikey",
+        "secretFormat": "key",
+        "style": "body"
+      },
+      "authKind": "apiKey",
+      "baseUrl": "https://rgvtrack.aargee.net/external/api/v2",
+      "deviceIdHint": "IMEI or vehicle ID",
+      "deviceIdLabel": "IMEI / Vehicle ID",
+      "deviceMatching": "strict",
+      "displayName": "Aargee GPS",
+      "fields": {
+        "displayName": "vehicle",
+        "falseValues": [
+          "off",
+          "false",
+          "0"
+        ],
+        "id": "vehicle",
+        "ignition": "ignition",
+        "imei": "imei",
+        "lastUpdated": "time",
+        "latitude": "lat",
+        "longitude": "lon",
+        "speed": "speed",
+        "trueValues": [
+          "on",
+          "true",
+          "1"
+        ]
+      },
+      "fleet": {
+        "body": {
+          "apikey": "{secret}",
+          "split_latlng": "True"
+        },
+        "method": "POST",
+        "path": "/get_all_vehicles_last_data/"
+      },
+      "genericCompatible": true,
+      "history": {
+        "body": {
+          "apikey": "{secret}",
+          "fromdate": "{from}",
+          "todate": "{to}",
+          "vehicle_id": "{deviceId}"
+        },
+        "method": "POST",
+        "path": "/get_vehicle_details/"
+      },
+      "historyDeviceParam": {
+        "imeiParam": "imei",
+        "vehicleIdParam": "vehicle_id"
+      },
+      "key": "aargee",
+      "listPath": "data",
+      "locationField": "location",
+      "minPollIntervalSeconds": 60,
+      "overrideBuiltin": false,
+      "rateLimitNote": "Rate limits: 100/day fleet list, 500/day last data, 10/day history per vehicle.",
+      "secretHint": "Your Aargee API key",
+      "secretLabel": "API Key",
+      "successCheck": {
+        "equals": 1,
+        "field": "status"
+      },
+      "supportsHistory": true,
+      "timeoutSeconds": 30,
+      "verified": true
+    },
+    {
+      "auth": {
+        "bodyField": "key",
+        "secretFormat": "userId:key",
+        "style": "body"
+      },
+      "authKind": "userIdAndKey",
+      "baseUrl": "http://livetrace.live:1234",
+      "deviceIdHint": "IMEI or LiveTrace user ID",
+      "deviceIdLabel": "IMEI / User ID",
+      "deviceMatching": "strict",
+      "displayName": "LiveTrace",
+      "fields": {
+        "displayName": "Reg_No",
+        "falseValues": [
+          "off",
+          "false",
+          "0"
+        ],
+        "id": "Reg_No",
+        "ignition": "Igni",
+        "imei": "imei",
+        "lastUpdated": "Time",
+        "latitude": "Lat",
+        "longitude": "Lon",
+        "speed": "Speed",
+        "trueValues": [
+          "on",
+          "true",
+          "1"
+        ]
+      },
+      "fleet": {
+        "body": {
+          "header": {
+            "Version": "1.0",
+            "clientName": "API_LiveTrace"
+          },
+          "request": {
+            "key": "{secret}",
+            "userid": "{userId}"
+          }
+        },
+        "method": "POST",
+        "path": "/Live_All"
+      },
+      "genericCompatible": true,
+      "key": "radiant",
+      "listPath": "response.LiveData",
+      "minPollIntervalSeconds": 30,
+      "overrideBuiltin": false,
+      "rateLimitNote": "Live snapshots only \u2014 no history endpoint.",
+      "secretHint": "user-id:key",
+      "secretLabel": "User ID: Key",
+      "supportsHistory": false,
+      "timeoutSeconds": 20,
+      "verified": true
+    },
+    {
+      "auth": {
+        "param": "username",
+        "secretFormat": "username:password",
+        "style": "query"
+      },
+      "authKind": "usernamePassword",
+      "baseUrl": "https://klconsole.mercydatrack.com/mtrack",
+      "deviceIdHint": "Registration number, e.g. KL00XX0000",
+      "deviceIdLabel": "Vehicle Registration",
+      "deviceMatching": "strict",
+      "displayName": "MercyDataTrack",
+      "fields": {
+        "displayName": "vehicle_registration",
+        "falseValues": [
+          "OFF",
+          "off",
+          "false",
+          "0"
+        ],
+        "id": "vehicle_registration",
+        "ignition": "ignition",
+        "imei": "imei_no",
+        "lastUpdated": "source_date",
+        "latitude": "latitude",
+        "longitude": "longitude",
+        "speed": "speed",
+        "trueValues": [
+          "ON",
+          "on",
+          "true",
+          "1"
+        ]
+      },
+      "fleet": {
+        "method": "GET",
+        "path": "/vehicle-live-data",
+        "query": {
+          "password": "{password}",
+          "username": "{username}",
+          "vehicle_registration": "{deviceId}"
+        }
+      },
+      "genericCompatible": true,
+      "key": "mercydatrack",
+      "listPath": "data",
+      "minPollIntervalSeconds": 60,
+      "overrideBuiltin": false,
+      "rateLimitNote": "Live snapshots only \u2014 no history endpoint.",
+      "secretHint": "username:password",
+      "secretLabel": "Username: Password",
+      "successCheck": {
+        "equals": "success",
+        "field": "status"
+      },
+      "supportsHistory": false,
+      "timeoutSeconds": 20,
+      "verified": true
+    },
+    {
+      "auth": {
+        "param": "username",
+        "secretFormat": "username:password",
+        "style": "query"
+      },
+      "authKind": "usernamePassword",
+      "baseUrl": "https://mobiles.pauldeatrack.com/ptrack",
+      "deviceIdHint": "Registration number, e.g. KL00XX0000",
+      "deviceIdLabel": "Vehicle Registration",
+      "deviceMatching": "strict",
+      "displayName": "PauldeaTrack",
+      "fields": {
+        "displayName": "vehicle_registration",
+        "falseValues": [
+          "OFF",
+          "off",
+          "false",
+          "0"
+        ],
+        "id": "vehicle_registration",
+        "ignition": "ignition",
+        "imei": "imei_no",
+        "lastUpdated": "source_date",
+        "latitude": "latitude",
+        "longitude": "longitude",
+        "speed": "speed",
+        "trueValues": [
+          "ON",
+          "on",
+          "true",
+          "1"
+        ]
+      },
+      "fleet": {
+        "method": "GET",
+        "path": "/vehicle-live-data",
+        "query": {
+          "password": "{password}",
+          "username": "{username}",
+          "vehicle_registration": "{deviceId}"
+        }
+      },
+      "genericCompatible": true,
+      "key": "pauldeatrack",
+      "listPath": "data",
+      "minPollIntervalSeconds": 60,
+      "overrideBuiltin": false,
+      "rateLimitNote": "Live snapshots only \u2014 no history endpoint.",
+      "secretHint": "username:password",
+      "secretLabel": "Username: Password",
+      "successCheck": {
+        "equals": "success",
+        "field": "status"
+      },
+      "supportsHistory": false,
+      "timeoutSeconds": 20,
+      "verified": true
+    },
+    {
+      "auth": {
+        "headerName": "x-api-key",
+        "secretFormat": "userId:key",
+        "style": "header"
+      },
+      "authKind": "userIdAndKey",
+      "baseUrl": "https://india.voltysoft.com/api/v12",
+      "deviceIdHint": "IMEI or SimplyTrack user ID",
+      "deviceIdLabel": "IMEI / User ID",
+      "deviceMatching": "strict",
+      "displayName": "SimplyTrack",
+      "fields": {
+        "displayName": "regno",
+        "falseValues": [
+          "false",
+          "0",
+          "OFF"
+        ],
+        "id": "regno",
+        "ignition": "engineOn",
+        "imei": "imei",
+        "lastUpdated": "time",
+        "latitude": "lat",
+        "longitude": "lon",
+        "speed": "speed",
+        "trueValues": [
+          "true",
+          "1",
+          "ON"
+        ]
+      },
+      "fleet": {
+        "method": "GET",
+        "path": "/vehicles/{userId}"
+      },
+      "genericCompatible": false,
+      "history": {
+        "method": "GET",
+        "path": "/vehicles/{userId}/{imei}/{fromEpoch}/{toEpoch}"
+      },
+      "key": "voltysoft",
+      "minPollIntervalSeconds": 60,
+      "overrideBuiltin": false,
+      "rateLimitNote": "100 requests/hour. Use HTTPS \u2014 plain HTTP returns 403.",
+      "secretHint": "user-id:api-key",
+      "secretLabel": "User ID: API Key",
+      "supportsHistory": true,
+      "timeoutSeconds": 20,
+      "verified": true
+    },
+    {
+      "auth": {
+        "param": "authKey",
+        "secretFormat": "key",
+        "style": "query"
+      },
+      "authKind": "apiKey",
+      "baseUrl": "https://cdn.hashtrace.com/api/Tracker",
+      "deviceIdHint": "Numeric vehicle ID, or IMEI",
+      "deviceIdLabel": "Vehicle ID / IMEI",
+      "deviceMatching": "strict",
+      "displayName": "HashTrace",
+      "fields": {
+        "displayName": "VName",
+        "falseValues": [
+          "false",
+          "0",
+          "OFF"
+        ],
+        "id": "VId",
+        "ignition": "Ign",
+        "imei": "Imei",
+        "lastUpdated": "TTime",
+        "latitude": "Lat",
+        "longitude": "Lon",
+        "speed": "Spd",
+        "trueValues": [
+          "true",
+          "1",
+          "ON"
+        ]
+      },
+      "fleet": {
+        "method": "GET",
+        "path": "/All",
+        "query": {
+          "authKey": "{secret}"
+        }
+      },
+      "genericCompatible": true,
+      "key": "hashtrace",
+      "minPollIntervalSeconds": 30,
+      "overrideBuiltin": false,
+      "rateLimitNote": "Live snapshots only \u2014 no history endpoint.",
+      "secretHint": "Your HashTrace auth key",
+      "secretLabel": "Auth Key",
+      "supportsHistory": false,
+      "timeoutSeconds": 20,
+      "vehicle": {
+        "method": "GET",
+        "path": "/Vehicle",
+        "query": {
+          "authKey": "{secret}",
+          "vehicleId": "{deviceId}"
+        }
+      },
+      "verified": true
+    }
+  ],
+  "version": 1
+}

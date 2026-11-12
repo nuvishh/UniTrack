@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import '../models/gps_provider.dart';
 import '../models/provider_credentials.dart';
+import '../models/provider_registry.dart';
 import '../models/saved_vehicle.dart';
 import '../models/vehicle.dart';
 import '../utils/parsing.dart';
@@ -37,6 +37,13 @@ class TrackerService {
 
   /// Human-readable per-account errors from the last refresh, or null.
   final ValueNotifier<String?> lastError = ValueNotifier(null);
+
+  /// Downloaded provider registry, when one is available. Set by
+  /// [TrackerNotifier] from [registryProvider]. Built-in clients are
+  /// used whenever there is no registry; a registry entry only adds a
+  /// provider or overrides a built-in under the rule in
+  /// providers/README.md (see [clientForSavedVehicle]).
+  ProviderRegistry? registry;
 
   Duration refreshInterval = const Duration(seconds: 60);
 
@@ -90,11 +97,15 @@ class TrackerService {
     Map<String, Vehicle> merged,
     List<String> errors,
   ) async {
-    final provider = GpsProvider.fromKey(account.providerKey);
+    final displayName = providerDisplayNameFor(
+      account.providerKey,
+      registry,
+    );
+    final minInterval = minPollIntervalFor(account.providerKey, registry);
     final accountKey = '${account.providerKey}:${account.deviceId}';
     final lastFetch = _lastFetchByAccount[accountKey];
     if (lastFetch != null &&
-        DateTime.now().difference(lastFetch) < provider.minPollInterval) {
+        DateTime.now().difference(lastFetch) < minInterval) {
       return;
     }
     try {
@@ -105,7 +116,7 @@ class TrackerService {
         );
         return;
       }
-      final client = clientFor(provider);
+      final client = clientForSavedVehicle(account.providerKey, registry);
       final credentials = ProviderCredentials(
         deviceId: account.deviceId,
         secret: secret,
@@ -121,16 +132,16 @@ class TrackerService {
         merged['${vehicle.providerKey}:${vehicle.id}'] = vehicle;
       }
     } on ProviderException catch (e) {
-      errors.add('${provider.displayName}: ${e.message}');
+      errors.add('$displayName: ${e.message}');
     } on UnsupportedError catch (e) {
-      errors.add('${provider.displayName}: ${e.message}');
+      errors.add('$displayName: ${e.message}');
     } on TimeoutException {
       // A slow account used to abort the whole refresh (and leave the
       // fleet list stale); now it is just one error line and the next
       // refresh retries it.
-      errors.add('${provider.displayName}: timed out — will retry next refresh.');
+      errors.add('$displayName: timed out — will retry next refresh.');
     } catch (e) {
-      errors.add('${provider.displayName}: $e');
+      errors.add('$displayName: $e');
     }
   }
 
@@ -171,7 +182,7 @@ class TrackerService {
     if (secret == null || secret.isEmpty) {
       throw ProviderException('No credentials saved for this account.');
     }
-    final client = clientFor(GpsProvider.fromKey(account.providerKey));
+    final client = clientForSavedVehicle(account.providerKey, registry);
     return client.fetchHistory(
       ProviderCredentials(
         deviceId: account.deviceId,

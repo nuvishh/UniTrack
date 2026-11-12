@@ -1,53 +1,62 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/navigation_provider.dart';
 import 'add_vehicle_screen.dart';
+import 'alerts_screen.dart';
+import 'dashboard_screen.dart';
 import 'fleet_list_screen.dart';
 import 'map_screen.dart';
-import 'settings_screen.dart';
+import 'reports_screen.dart';
 
-/// Home shell: bottom navigation between Fleet, Map and Settings.
+/// Home shell: bottom navigation between Dashboard, Fleet, Map,
+/// Reports and Alerts.
 ///
-/// Thumb-reachable navigation (2026-11-11 modern refresh) — the three
-/// main views are tabs now instead of small icons in the fleet
-/// AppBar. The tabs keep their state in an IndexedStack; the
-/// "Add vehicle" action lives here and shows only on the Fleet tab.
-class HomeScreen extends StatefulWidget {
+/// The tab index lives in [homeNavProvider] (not local state) so
+/// other screens can switch tabs — a fleet card's "Reports" action
+/// opens the Reports tab for that vehicle, an alert's "View on Map"
+/// opens the Map tab centred on it. Settings moved to a gear icon in
+/// the Dashboard AppBar. The "Add vehicle" action shows only on the
+/// Fleet tab.
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  int _index = 0;
-
   static const _tabs = [
+    DashboardScreen(),
     FleetListScreen(),
     MapScreen(),
-    SettingsScreen(),
+    ReportsScreen(),
+    AlertsScreen(),
   ];
 
-  Future<void> _openAddVehicle() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const AddVehicleScreen()),
-    );
-  }
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tab = ref.watch(homeNavProvider.select((s) => s.tab));
     return Scaffold(
-      body: IndexedStack(index: _index, children: _tabs),
-      floatingActionButton: _index == 0
+      body: IndexedStack(index: tab, children: _tabs),
+      floatingActionButton: tab == 1
           ? FloatingActionButton.extended(
-              onPressed: _openAddVehicle,
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const AddVehicleScreen(),
+                  ),
+                );
+              },
               icon: const Icon(Icons.add),
               label: const Text('Add vehicle'),
             )
           : null,
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (index) => setState(() => _index = index),
+        selectedIndex: tab,
+        onDestinationSelected: (index) =>
+            ref.read(homeNavProvider.notifier).goToTab(index),
         destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
           NavigationDestination(
             icon: Icon(Icons.directions_bus_outlined),
             selectedIcon: Icon(Icons.directions_bus),
@@ -59,9 +68,14 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Map',
           ),
           NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
+            icon: Icon(Icons.assignment_outlined),
+            selectedIcon: Icon(Icons.assignment),
+            label: 'Reports',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.notifications_outlined),
+            selectedIcon: Icon(Icons.notifications),
+            label: 'Alerts',
           ),
         ],
       ),

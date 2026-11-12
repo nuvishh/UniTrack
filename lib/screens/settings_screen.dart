@@ -1,17 +1,26 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
-import '../models/gps_provider.dart';
 import '../models/saved_vehicle.dart';
+import '../providers/alerts_provider.dart';
+import '../providers/geofences_provider.dart';
+import '../providers/registry_provider.dart';
 import '../providers/saved_vehicles_provider.dart';
 import '../providers/storage_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/tracker_provider.dart';
+import '../services/backup_service.dart';
+import '../services/provider_registry_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
 
 /// Settings: appearance, refresh interval, saved vehicles, provider
-/// status and app info.
+/// status, alerts, backup & restore, and app info.
 ///
 /// Everything here is shared state from providers — theme from
 /// [themeProvider], the refresh interval from [trackerProvider], the
@@ -72,6 +81,155 @@ class SettingsScreen extends ConsumerWidget {
     await ref.read(trackerProvider.notifier).refreshAll();
   }
 
+  /// Exports every saved vehicle + its credentials as one JSON file
+  /// and opens the share sheet. A warning is shown first: the file
+  /// contains API keys and passwords in plain text.
+  Future<void> _exportBackup(BuildContext context, WidgetRef ref) async {
+    final storage = ref.read(secureStorageServiceProvider);
+    final vehicles = await ref.read(savedVehiclesProvider.future);
+    final items = <BackupVehicle>[];
+    for (final vehicle in vehicles) {
+      final secret = await storage.readSecret(vehicle.id);
+      if (secret == null || secret.isEmpty) continue;
+      items.add(
+        BackupVehicle(
+          providerKey: vehicle.providerKey,
+          deviceId: vehicle.deviceId,
+          secret: secret,
+          regNo: vehicle.regNo,
+          displayName: vehicle.displayName,
+        ),
+      );
+    }
+    if (!context.mounted) return;
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nothing to back up yet.')),
+      );
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Export contains your keys'),
+        content: Text(
+          'This backup file contains your API keys and passwords in '
+          'plain text — ${items.length} vehicle${items.length == 1 ? '' : 's'}. '
+          'Anyone with the file can track your vehicles.\n\n'
+          'Keep it private: store it somewhere safe and never send '
+          'it to anyone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Export anyway'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final now = DateTime.now();
+    final stamp =
+        '${now.year}${now.month.toString().padLeft(2, '0')}'
+        '${now.day.toString().padLeft(2, '0')}-'
+        '${now.hour.toString().padLeft(2, '0')}'
+        '${now.minute.toString().padLeft(2, '0')}';
+    final filename = 'unitrack-backup-$stamp.json';
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [
+          XFile.fromData(
+            utf8.encode(buildBackupJson(items)),
+            name: filename,
+            mimeType: 'application/json',
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Imports a backup JSON file: validates strictly, skips
+  /// duplicates, restores the rest, then refreshes the fleet.
+  Future<void> _importBackup(BuildContext context, WidgetRef ref) async {
+    final picked = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+    if (picked.isEmpty || !context.mounted) return;
+    Uint8List bytes;
+    try {
+      bytes = await picked.first.readAsBytes();
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not read that file.')),
+      );
+      return;
+    }
+    List<BackupVehicle> imported;
+    try {
+      imported = parseBackup(utf8.decode(bytes));
+    } on BackupFormatException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+      return;
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not read this backup file.'),
+        ),
+      );
+      return;
+    }
+    final existing = await ref.read(savedVehiclesProvider.future);
+    final plan = planImport(
+      existing
+          .map(
+            (v) => BackupVehicle(
+              providerKey: v.providerKey,
+              deviceId: v.deviceId,
+              secret: '',
+            ),
+          )
+          .toList(),
+      imported,
+    );
+    final storage = ref.read(secureStorageServiceProvider);
+    final base = DateTime.now().millisecondsSinceEpoch;
+    for (var i = 0; i < plan.fresh.length; i++) {
+      final vehicle = plan.fresh[i];
+      await storage.saveVehicle(
+        SavedVehicle(
+          id: '${base + i}',
+          providerKey: vehicle.providerKey,
+          deviceId: vehicle.deviceId,
+          regNo: vehicle.regNo,
+          displayName: vehicle.displayName,
+        ),
+        vehicle.secret,
+      );
+    }
+    ref.invalidate(savedVehiclesProvider);
+    await ref.read(trackerProvider.notifier).refreshAll();
+    if (!context.mounted) return;
+    final importedCount = plan.fresh.length;
+    final message = importedCount == 0
+        ? plan.skipped == 0
+              ? 'This backup has no vehicles to import.'
+              : 'Nothing new — all ${plan.skipped} vehicle${plan.skipped == 1 ? '' : 's'} '
+                    'are already saved.'
+        : '$importedCount imported'
+              '${plan.skipped == 0 ? '' : ', ${plan.skipped} skipped as duplicate${plan.skipped == 1 ? '' : 's'}'}.';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -84,6 +242,11 @@ class SettingsScreen extends ConsumerWidget {
       AsyncData(:final value) => value.length,
       _ => 0,
     };
+    final descriptors = ref.watch(providerDescriptorsProvider);
+    final descriptorByKey = {for (final d in descriptors) d.key: d};
+    final registryState = ref.watch(registryProvider);
+    final alertsState = ref.watch(alertsProvider);
+    final geofenceCount = ref.watch(geofencesProvider).length;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -140,6 +303,113 @@ class SettingsScreen extends ConsumerWidget {
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 24),
+          const SectionHeader(title: 'Alerts'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Overspeed limit',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 10),
+                  SegmentedButton<double>(
+                    segments: [60, 80, 100, 120]
+                        .map(
+                          (v) => ButtonSegment(
+                            value: v.toDouble(),
+                            label: Text('$v'),
+                          ),
+                        )
+                        .toList(),
+                    selected: {alertsState.overspeedThresholdKmh},
+                    onSelectionChanged: (selected) {
+                      ref
+                          .read(alertsProvider.notifier)
+                          .setOverspeedThreshold(selected.first);
+                    },
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'An alert fires when a vehicle crosses above '
+                    '${alertsState.overspeedThresholdKmh.toStringAsFixed(0)} km/h. '
+                    '$geofenceCount geofence${geofenceCount == 1 ? '' : 's'} '
+                    'active — add one from a vehicle\'s detail screen.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: alertsState.alerts.isEmpty
+                          ? null
+                          : () async {
+                              await ref
+                                  .read(alertsProvider.notifier)
+                                  .clearAll();
+                            },
+                      icon: const Icon(Icons.delete_sweep_outlined),
+                      label: Text(
+                        'Clear alert history (${alertsState.alerts.length})',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'SOS alerts are not available — no GPS provider '
+                    'reports SOS.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const SectionHeader(title: 'Backup & restore'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Reinstalling the app wipes saved vehicles and '
+                    'credentials. Export a backup first, then import it '
+                    'after reinstalling.',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => _exportBackup(context, ref),
+                      icon: const Icon(Icons.download_outlined),
+                      label: const Text('Export configuration'),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _importBackup(context, ref),
+                      icon: const Icon(Icons.upload_outlined),
+                      label: const Text('Import configuration'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'The backup file contains your API keys and '
+                    'passwords in plain text — keep it private and '
+                    'never send it to anyone.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
           SectionHeader(
             title: 'Saved vehicles',
             trailing: Container(
@@ -170,7 +440,9 @@ class SettingsScreen extends ConsumerWidget {
               }
               return Column(
                 children: vehicles.map((vehicle) {
-                  final provider = GpsProvider.fromKey(vehicle.providerKey);
+                  final displayName =
+                      descriptorByKey[vehicle.providerKey]?.displayName ??
+                      vehicle.providerKey;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: Card(
@@ -190,7 +462,7 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                         title: Text(vehicle.displayName ?? vehicle.deviceId),
                         subtitle: Text(
-                          '${provider.displayName} · ${vehicle.deviceId}',
+                          '$displayName · ${vehicle.deviceId}',
                         ),
                         trailing: IconButton(
                           icon: const Icon(Icons.delete_outline),
@@ -214,9 +486,54 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 24),
-          const SectionHeader(title: 'Providers'),
-          ...GpsProvider.values.map(
-            (provider) => Padding(
+          SectionHeader(
+            title: 'Providers',
+            trailing: TextButton.icon(
+              onPressed: registryState.isRefreshing
+                  ? null
+                  : () async {
+                      final ok = await ref
+                          .read(registryProvider.notifier)
+                          .refresh();
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            ok
+                                ? 'Provider list updated.'
+                                : 'Could not reach the provider list — '
+                                      'using the built-in providers.',
+                          ),
+                        ),
+                      );
+                    },
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Refresh providers'),
+            ),
+          ),
+          if (registryState.registry != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                registryState.source == RegistrySource.remote
+                    ? 'Provider list fetched just now (v${registryState.registry!.version}).'
+                    : 'Provider list from cache '
+                          '(v${registryState.registry!.version}) — '
+                          'refreshed every 24h.',
+                style: theme.textTheme.bodySmall,
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                'Using the built-in providers — the remote provider '
+                'list could not be loaded (offline or unavailable).',
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+          ...descriptors.map(
+            (descriptor) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Card(
                 child: ListTile(
@@ -224,18 +541,42 @@ class SettingsScreen extends ConsumerWidget {
                     width: 46,
                     height: 46,
                     decoration: BoxDecoration(
-                      color: AppColors.providerColor(provider.key)
+                      color: AppColors.providerColor(descriptor.key)
                           .withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
                       Icons.satellite_alt_outlined,
-                      color: AppColors.providerColor(provider.key),
+                      color: AppColors.providerColor(descriptor.key),
                     ),
                   ),
-                  title: Text(provider.displayName),
-                  subtitle: Text(provider.rateLimitNote),
-                  trailing: ProviderStatusPill(provider: provider),
+                  title: Row(
+                    children: [
+                      Expanded(child: Text(descriptor.displayName)),
+                      if (descriptor.isRemote)
+                        Container(
+                          margin: const EdgeInsets.only(left: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.sky.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Text(
+                            'Remote',
+                            style: TextStyle(
+                              color: AppColors.sky,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  subtitle: Text(descriptor.rateLimitNote),
+                  trailing: ProviderStatusPill(descriptor: descriptor),
                 ),
               ),
             ),
@@ -274,7 +615,7 @@ class SettingsScreen extends ConsumerWidget {
                           children: [
                             Text('UniTrack', style: theme.textTheme.titleLarge),
                             Text(
-                              'Version 1.0.7 (build 8)',
+                              'Version 1.1.0 (build 9)',
                               style: theme.textTheme.bodySmall,
                             ),
                           ],

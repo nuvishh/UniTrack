@@ -15,9 +15,13 @@ import '../models/vehicle.dart';
 class AppColors {
   // Brand.
   static const Color primary = Color(0xFF2547F4); // vivid royal blue
-  static const Color primaryDarkTheme = Color(0xFF6C8CFF);
+  static const Color primaryDarkTheme = Color(0xFF38BDF8); // sky blue
   static const Color secondary = Color(0xFF00A896); // teal
   static const Color accent = Color(0xFFFFB020); // warm amber
+
+  /// Sky blue — the Volty-style highlight for interactive elements in
+  /// the dark theme (active chips, FAB, navigation indicator).
+  static const Color sky = Color(0xFF38BDF8);
 
   // Fleet status — vivid and unmistakable.
   static const Color live = Color(0xFF00A651);
@@ -78,6 +82,12 @@ class AppColors {
 
 /// The two UniTrack themes (light + dark). Everything screens build with
 /// comes from here — no hard-coded colours or text styles in screens.
+///
+/// Volty-inspired polish (v1.1.0): the dark theme uses a sky-blue
+/// primary for interactive highlights (active chips, FAB, navigation
+/// indicator) over deep-navy surfaces, with slightly stronger card
+/// outlines so cards read on small phones. Status colours keep their
+/// meaning in both themes.
 class AppTheme {
   static const double cardRadius = 20;
   static const double fieldRadius = 16;
@@ -199,7 +209,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(cardRadius),
           side: BorderSide(
             color: (isDark ? Colors.white : Colors.black).withValues(
-              alpha: 0.06,
+              alpha: isDark ? 0.10 : 0.06,
             ),
           ),
         ),
@@ -285,7 +295,7 @@ class AppTheme {
         backgroundColor: surface,
         elevation: 2,
         shadowColor: Colors.black.withValues(alpha: 0.1),
-        indicatorColor: primary.withValues(alpha: 0.14),
+        indicatorColor: primary.withValues(alpha: 0.18),
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
             size: 26,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/gps_provider.dart';
+import '../models/provider_descriptor.dart';
+import '../providers/registry_provider.dart';
 import '../theme/app_theme.dart';
 
 /// Bold section heading used across screens ("Fleet", "Saved vehicles"…),
@@ -28,14 +30,20 @@ class SectionHeader extends StatelessWidget {
 }
 
 /// Small pill identifying a provider, tinted with its bold brand colour.
-class ProviderBadge extends StatelessWidget {
+/// Small coloured pill naming the provider, with a dot. Resolves the
+/// display name through the provider descriptors, so registry-added
+/// providers show their name too (and an unknown key falls back to
+/// the key itself instead of throwing).
+class ProviderBadge extends ConsumerWidget {
   const ProviderBadge({super.key, required this.providerKey});
 
   final String providerKey;
 
   @override
-  Widget build(BuildContext context) {
-    final provider = GpsProvider.fromKey(providerKey);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final descriptors = ref.watch(providerDescriptorsProvider);
+    final match = descriptors.where((d) => d.key == providerKey);
+    final displayName = match.isEmpty ? providerKey : match.first.displayName;
     final color = AppColors.providerColor(providerKey);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
@@ -53,7 +61,7 @@ class ProviderBadge extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            provider.displayName,
+            displayName,
             style: TextStyle(
               color: color,
               fontWeight: FontWeight.w800,
@@ -68,13 +76,13 @@ class ProviderBadge extends StatelessWidget {
 
 /// A verified / needs-setup pill for a provider.
 class ProviderStatusPill extends StatelessWidget {
-  const ProviderStatusPill({super.key, required this.provider});
+  const ProviderStatusPill({super.key, required this.descriptor});
 
-  final GpsProvider provider;
+  final ProviderDescriptor descriptor;
 
   @override
   Widget build(BuildContext context) {
-    final verified = provider.verified;
+    final verified = descriptor.verified;
     final color = verified ? AppColors.live : AppColors.idle;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
