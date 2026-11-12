@@ -316,7 +316,12 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: ink,
+        // NOTE: never use `ink` here — in the dark theme ink is near-white
+        // (#F2F3FA), which made white snackbar text unreadable (white on
+        // white). The background must stay dark in both themes.
+        backgroundColor: isDark
+            ? AppColors.darkSurfaceRaised
+            : AppColors.lightInk,
         contentTextStyle: const TextStyle(color: Colors.white, fontSize: 15),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
