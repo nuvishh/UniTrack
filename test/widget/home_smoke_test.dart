@@ -206,11 +206,15 @@ void main() {
         expect(find.text('Backup & restore'), findsOneWidget);
         // The About card sits below the fold in a ListView — scroll
         // it into view; offscreen ListView children are not built.
+        // Version-agnostic on purpose: the string changes every bump.
         await tester.scrollUntilVisible(
-          find.text('Version 1.2.0 (build 11)'),
+          find.textContaining(RegExp(r'Version \d+\.\d+\.\d+')),
           200,
         );
-        expect(find.text('Version 1.2.0 (build 11)'), findsOneWidget);
+        expect(
+          find.textContaining(RegExp(r'Version \d+\.\d+\.\d+')),
+          findsOneWidget,
+        );
         // No Alerts section any more — notifications don't arrive
         // on the user's phone, so the app dropped them in v1.2.0.
         expect(find.text('Alerts'), findsNothing);

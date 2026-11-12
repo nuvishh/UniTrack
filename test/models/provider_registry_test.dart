@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:unitrack/models/gps_provider.dart';
 import 'package:unitrack/models/provider_registry.dart';
 
 void main() {
@@ -147,6 +148,10 @@ void main() {
      "auth": {"style": "body", "bodyField": "apikey", "secretFormat": "key"},
      "fleet": {"method": "GET", "path": "/fleet"},
      "fields": {"id": "id", "displayName": "name"}},
+    {"key": "mercydatrack4g", "displayName": "MercyDataTrack (4G)", "baseUrl": "https://proconsole.mercydatrack.com/mtrack",
+     "auth": {"style": "query", "param": "username", "secretFormat": "username:password"},
+     "fleet": {"method": "GET", "path": "/vehicle-data"},
+     "fields": {"id": "id", "displayName": "name"}},
     {"key": "newco", "displayName": "NewCo", "baseUrl": "https://new.example.com",
      "auth": {"style": "query", "param": "key", "secretFormat": "key"},
      "fleet": {"method": "GET", "path": "/fleet"},
@@ -159,7 +164,27 @@ void main() {
 }
 ''';
       final registry = parseProviderRegistry(raw);
+      // Regression (v1.2.0): the registry's mercydatrack4g entry leaked
+      // into newProviders as a "Remote" duplicate of the built-in,
+      // because the built-in key set was hardcoded with only 7 keys.
       expect(registry.newProviders.map((e) => e.key), ['newco']);
+    });
+
+    test('newProviders stays empty when the registry lists every built-in', () {
+      final keys = GpsProvider.values.map((p) => p.key).toList();
+      final entries = keys
+          .map(
+            (key) =>
+                '{"key": "$key", "displayName": "$key", "baseUrl": "https://x.example.com", '
+                '"auth": {"style": "query", "param": "key", "secretFormat": "key"}, '
+                '"fleet": {"method": "GET", "path": "/fleet"}, '
+                '"fields": {"id": "id", "displayName": "name"}}',
+          )
+          .join(',\n    ');
+      final registry = parseProviderRegistry(
+        '{"version": 2, "providers": [$entries]}',
+      );
+      expect(registry.newProviders, isEmpty);
     });
   });
 }

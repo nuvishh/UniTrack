@@ -1,11 +1,13 @@
 import 'dart:convert';
 
+import 'gps_provider.dart';
+
 /// A provider registry: providers described as data, so a new GPS
 /// provider can be added (or an endpoint moved) without an app update.
 ///
 /// The registry is fetched over HTTPS from a fixed URL (see
 /// [ProviderRegistryService]) and cached. See providers/README.md for
-/// the fallback rule: the 7 built-in clients stay the source of truth,
+/// the fallback rule: the built-in clients stay the source of truth,
 /// a registry entry only ADDS a new provider, and it only overrides a
 /// built-in when marked `overrideBuiltin` + `genericCompatible` AND its
 /// base URL is https.
@@ -52,16 +54,13 @@ class ProviderRegistry {
   /// Entries for providers the app does not ship built-in, usable as
   /// new providers. Only https entries are ever usable — an http
   /// entry would send the user's credentials in cleartext.
+  ///
+  /// The built-in key set is derived from [GpsProvider.values], so a
+  /// provider added to the app can never leak into this list as a
+  /// "Remote" duplicate (as mercydatrack4g did in v1.2.0, when the
+  /// hardcoded set below still listed only 7 keys).
   List<RegistryEntry> get newProviders {
-    const builtinKeys = {
-      'transight',
-      'aargee',
-      'radiant',
-      'mercydatrack',
-      'pauldeatrack',
-      'voltysoft',
-      'hashtrace',
-    };
+    final builtinKeys = GpsProvider.values.map((p) => p.key).toSet();
     return entries
         .where((e) => !builtinKeys.contains(e.key) && e.isHttps)
         .toList();

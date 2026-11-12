@@ -93,7 +93,7 @@ class RegistryNotifier extends Notifier<RegistryState> {
 final registryProvider =
     NotifierProvider<RegistryNotifier, RegistryState>(RegistryNotifier.new);
 
-/// All providers the user can pick in the add-vehicle wizard: the 7
+/// All providers the user can pick in the add-vehicle wizard: the
 /// built-ins first, then registry-added providers (https only) with a
 /// "Remote" badge in the UI.
 final providerDescriptorsProvider = Provider<List<ProviderDescriptor>>((
