@@ -46,12 +46,6 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
   String _selectedProviderKey = 'all';
   VehicleCategory? _selectedCategory;
   Set<VehicleStatus>? _selectedStatuses;
-
-  /// Narrows a LIVE selection further by motion: true = moving
-  /// (speed above 5 km/h), false = idle (ignition on, not moving).
-  /// Null means "don't narrow". The status chips and the summary
-  /// strip both write these two fields.
-  bool? _movingOnly;
   DateTime? _lastRefreshed;
   bool _wasRefreshing = false;
   Timer? _labelTimer;
@@ -112,16 +106,6 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
     if (_selectedStatuses != null) {
       list = list.where((v) => _selectedStatuses!.contains(v.status)).toList();
     }
-    if (_movingOnly != null) {
-      final moving = _movingOnly!;
-      list = list
-          .where(
-            (v) =>
-                v.status == VehicleStatus.live &&
-                (((v.speedKmph ?? 0) > 5) == moving),
-          )
-          .toList();
-    }
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
       list = list.where((v) {
@@ -177,13 +161,6 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
         .where((v) => v.status == VehicleStatus.idle)
         .length;
     final offlineCount = vehicles.length - liveCount - idleCount;
-    final movingCount = vehicles
-        .where(
-          (v) =>
-              v.status == VehicleStatus.live && (v.speedKmph ?? 0) > 5,
-        )
-        .length;
-    final idleMovingCount = liveCount - movingCount;
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
@@ -260,7 +237,6 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
                   _selectedStatuses!.length == statuses.length &&
                   _selectedStatuses!.containsAll(statuses);
               _selectedStatuses = same ? null : statuses;
-              _movingOnly = null;
             }),
           ),
           Padding(
@@ -322,14 +298,12 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
           if (vehicles.isNotEmpty)
             _StatusFilterChips(
               total: vehicles.length,
-              moving: movingCount,
-              idle: idleMovingCount,
-              stopped: idleCount,
+              live: liveCount,
+              idle: idleCount,
+              offline: offlineCount,
               selectedStatuses: _selectedStatuses,
-              movingOnly: _movingOnly,
-              onSelect: (statuses, movingOnly) => setState(() {
+              onSelect: (statuses) => setState(() {
                 _selectedStatuses = statuses;
-                _movingOnly = movingOnly;
               }),
             ),
           if (error != null && vehicles.isNotEmpty)
@@ -411,7 +385,6 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
               _selectedProviderKey = 'all';
               _selectedCategory = null;
               _selectedStatuses = null;
-              _movingOnly = null;
             });
           },
         ),
@@ -898,37 +871,36 @@ class _CategoryFilterChips extends StatelessWidget {
   }
 }
 
-/// Status filter chips, Volty-style: All / Moving / Idle / Stopped,
-/// with counts. They write the same filter state as the tappable
-/// summary strip above (Moving = live + speed above 5 km/h, Idle =
-/// live + not moving, Stopped = ignition off).
+/// Status filter chips: All / Live / Idle / Offline, with counts.
+///
+/// They use the same taxonomy as the summary strip above and the
+/// status badge on each card — Live = ignition on, Idle = ignition
+/// off, Offline = no fix / expired — and write the same filter
+/// state as the tappable summary strip, so a chip and its summary
+/// stat always select the same vehicles.
 class _StatusFilterChips extends StatelessWidget {
   const _StatusFilterChips({
     required this.total,
-    required this.moving,
+    required this.live,
     required this.idle,
-    required this.stopped,
+    required this.offline,
     required this.selectedStatuses,
-    required this.movingOnly,
     required this.onSelect,
   });
 
   final int total;
-  final int moving;
+  final int live;
   final int idle;
-  final int stopped;
+  final int offline;
   final Set<VehicleStatus>? selectedStatuses;
-  final bool? movingOnly;
-  final void Function(Set<VehicleStatus>? statuses, bool? movingOnly)
-  onSelect;
+  final void Function(Set<VehicleStatus>? statuses) onSelect;
 
-  bool get _allSelected => selectedStatuses == null && movingOnly == null;
+  bool get _allSelected => selectedStatuses == null;
 
-  bool _isSelected(Set<VehicleStatus> statuses, bool? moving) {
+  bool _isSelected(Set<VehicleStatus> statuses) {
     return selectedStatuses != null &&
         selectedStatuses!.length == statuses.length &&
-        selectedStatuses!.containsAll(statuses) &&
-        movingOnly == moving;
+        selectedStatuses!.containsAll(statuses);
   }
 
   @override
@@ -977,24 +949,24 @@ class _StatusFilterChips extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Row(
         children: [
-          chip('All', total, _allSelected, () => onSelect(null, null)),
+          chip('All', total, _allSelected, () => onSelect(null)),
           chip(
-            'Moving',
-            moving,
-            _isSelected({VehicleStatus.live}, true),
-            () => onSelect({VehicleStatus.live}, true),
+            'Live',
+            live,
+            _isSelected({VehicleStatus.live}),
+            () => onSelect({VehicleStatus.live}),
           ),
           chip(
             'Idle',
             idle,
-            _isSelected({VehicleStatus.live}, false),
-            () => onSelect({VehicleStatus.live}, false),
+            _isSelected({VehicleStatus.idle}),
+            () => onSelect({VehicleStatus.idle}),
           ),
           chip(
-            'Stopped',
-            stopped,
-            _isSelected({VehicleStatus.idle}, null),
-            () => onSelect({VehicleStatus.idle}, null),
+            'Offline',
+            offline,
+            _isSelected({VehicleStatus.unknown, VehicleStatus.expired}),
+            () => onSelect({VehicleStatus.unknown, VehicleStatus.expired}),
           ),
         ],
       ),

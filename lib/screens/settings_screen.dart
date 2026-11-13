@@ -621,7 +621,7 @@ class SettingsScreen extends ConsumerWidget {
                           children: [
                             Text('UniTrack', style: theme.textTheme.titleLarge),
                             Text(
-                              'Version 1.3.0 (build 13)',
+                              'Version 1.3.0 (build 14)',
                               style: theme.textTheme.bodySmall,
                             ),
                           ],

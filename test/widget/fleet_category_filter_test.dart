@@ -53,7 +53,7 @@ const _car = Vehicle(
   displayName: 'KL00XX0002',
   providerKey: 'hashtrace',
   speedKmph: 0,
-  ignition: true,
+  ignition: false,
   status: VehicleStatus.idle,
   category: VehicleCategory.car,
 );
@@ -152,13 +152,13 @@ void main() {
   testWidgets('category filter combines with status filter', (tester) async {
     await _pumpFleet(tester);
 
-    // The 'Stopped' chip selects idle-status vehicles — the car.
-    await tester.tap(find.text('Stopped (1)'));
+    // The 'Idle' chip selects idle-status vehicles — the car.
+    await tester.tap(find.text('Idle (1)'));
     await tester.pump();
     expect(_card('KL00XX0002'), findsOneWidget);
     expect(_card('KL00XX0001'), findsNothing);
 
-    // Bus filter + Stopped status = nothing matches.
+    // Bus filter + Idle status = nothing matches.
     await tester.tap(find.text('Bus (1)'));
     await tester.pump();
     expect(find.text('No matches'), findsOneWidget);
@@ -167,5 +167,41 @@ void main() {
     await tester.tap(find.text('Car (1)'));
     await tester.pump();
     expect(_card('KL00XX0002'), findsOneWidget);
+  });
+
+  testWidgets('status chips use the summary taxonomy: Live/Idle/Offline',
+      (tester) async {
+    await _pumpFleet(tester);
+
+    // One live bus, one idle (ignition-off) car, one offline truck:
+    // the counts on the chips match the summary strip and the card
+    // badges — the idle car is "Idle", never "Stopped".
+    expect(find.text('Live (1)'), findsOneWidget);
+    expect(find.text('Idle (1)'), findsOneWidget);
+    expect(find.text('Offline (1)'), findsOneWidget);
+    expect(find.text('Stopped (1)'), findsNothing);
+    expect(find.text('Moving (1)'), findsNothing);
+
+    // The Idle chip shows the ignition-off car (its card badge also
+    // reads Idle), and the Live chip shows only the bus.
+    await tester.tap(find.text('Idle (1)'));
+    await tester.pump();
+    expect(_card('KL00XX0002'), findsOneWidget);
+    expect(_card('KL00XX0001'), findsNothing);
+    expect(_card('KL00XX0003'), findsNothing);
+
+    await tester.tap(find.text('All (3)').at(2));
+    await tester.pump();
+    await tester.tap(find.text('Live (1)'));
+    await tester.pump();
+    expect(_card('KL00XX0001'), findsOneWidget);
+    expect(_card('KL00XX0002'), findsNothing);
+
+    await tester.tap(find.text('All (3)').at(2));
+    await tester.pump();
+    await tester.tap(find.text('Offline (1)'));
+    await tester.pump();
+    expect(_card('KL00XX0003'), findsOneWidget);
+    expect(_card('KL00XX0001'), findsNothing);
   });
 }
