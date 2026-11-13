@@ -22,7 +22,9 @@ import 'add_vehicle_screen.dart';
 import 'vehicle_detail_screen.dart';
 
 /// Home screen: every vehicle from every provider, with a live summary,
-/// search, provider + category filters and big readable vehicle cards.
+/// search, a compact status filter bar and big readable vehicle cards.
+/// Provider + category filters live in the Filters bottom sheet
+/// (v1.3.1) — three chip rows took up the whole screen.
 ///
 /// The fleet screen is also the app's dashboard now (v1.2.0): the
 /// gradient summary strip on top carries the Live / Idle / Offline
@@ -282,29 +284,19 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
             ),
           ),
           if (vehicles.isNotEmpty)
-            _ProviderFilterChips(
-              vehicles: vehicles,
-              descriptors: descriptorByKey,
-              selectedKey: _selectedProviderKey,
-              onSelected: (key) => setState(() => _selectedProviderKey = key),
-            ),
-          if (vehicles.isNotEmpty)
-            _CategoryFilterChips(
-              vehicles: vehicles,
-              selected: _selectedCategory,
-              onSelected: (category) =>
-                  setState(() => _selectedCategory = category),
-            ),
-          if (vehicles.isNotEmpty)
-            _StatusFilterChips(
+            _FilterBar(
               total: vehicles.length,
               live: liveCount,
               idle: idleCount,
               offline: offlineCount,
               selectedStatuses: _selectedStatuses,
-              onSelect: (statuses) => setState(() {
+              onSelectStatus: (statuses) => setState(() {
                 _selectedStatuses = statuses;
               }),
+              activeFilterCount:
+                  (_selectedProviderKey != 'all' ? 1 : 0) +
+                  (_selectedCategory != null ? 1 : 0),
+              onOpenFilters: _openFilterSheet,
             ),
           if (error != null && vehicles.isNotEmpty)
             Padding(
@@ -345,7 +337,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
               title: 'No vehicles yet',
               message:
                   'Add a vehicle from any GPS provider — Transight, '
-                  'Aargee, LiveTrace, MercyDataTrack, PauldeaTrack, '
+                  'Aargee, LiveTrace, Mercydatrack, PauldeaTrack, '
                   'SimplyTrack or HashTrace — and track them all here.',
               actionLabel: 'Add your first vehicle',
               onAction: _openAddVehicle,
@@ -354,15 +346,15 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
         );
       }
       // The empty state is tall (icon + long message + button); on a
-      // short screen the filter rows above leave too little room, so
-      // it scrolls instead of overflowing.
+      // short screen the summary strip + filter bar above leave too
+      // little room, so it scrolls instead of overflowing.
       return _ScrollableEmptyState(
         child: EmptyState(
           icon: Icons.directions_bus_outlined,
           title: 'No vehicles yet',
           message:
               'Add a vehicle from any GPS provider — Transight, Aargee, '
-              'LiveTrace, MercyDataTrack, PauldeaTrack, SimplyTrack or '
+              'LiveTrace, Mercydatrack, PauldeaTrack, SimplyTrack or '
               'HashTrace — and track them all here.',
           actionLabel: 'Add your first vehicle',
           onAction: _openAddVehicle,
@@ -394,7 +386,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
       onRefresh: _refresh,
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         itemCount: filtered.length,
         itemBuilder: (context, index) {
           final vehicle = filtered[index];
@@ -459,6 +451,139 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
     ref
         .read(homeNavProvider.notifier)
         .focusVehicleOnMap('${vehicle.providerKey}:${vehicle.id}');
+  }
+
+  /// The Filters bottom sheet: provider + category chips live here
+  /// now (v1.3.1) instead of two more chip rows on the screen — the
+  /// user said the rows took up the whole screen. The compact bar
+  /// above keeps only the status chips; the sheet holds the rest.
+  ///
+  /// Tapping a chip applies immediately: the parent filter state
+  /// updates (so the list behind the sheet filters at once) and the
+  /// sheet repaints via [StatefulBuilder]. "Clear all" resets
+  /// provider + category to All (status untouched); "Done" closes.
+  Future<void> _openFilterSheet() {
+    final theme = Theme.of(context);
+    final descriptors = ref.read(providerDescriptorsProvider);
+    final descriptorByKey = {for (final d in descriptors) d.key: d};
+    final vehicles = ref.read(trackerProvider).vehicles;
+    final providerCounts = <String, int>{};
+    final categoryCounts = <VehicleCategory, int>{};
+    for (final v in vehicles) {
+      providerCounts[v.providerKey] = (providerCounts[v.providerKey] ?? 0) + 1;
+      categoryCounts[v.category] = (categoryCounts[v.category] ?? 0) + 1;
+    }
+    final providerKeys = ['all', ...providerCounts.keys.toList()..sort()];
+    final categories = VehicleCategory.values
+        .where((c) => categoryCounts.containsKey(c))
+        .toList();
+
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            void applyProvider(String key) {
+              setState(() => _selectedProviderKey = key);
+              setSheetState(() {});
+            }
+
+            void applyCategory(VehicleCategory? category) {
+              setState(() => _selectedCategory = category);
+              setSheetState(() {});
+            }
+
+            void clearAll() {
+              setState(() {
+                _selectedProviderKey = 'all';
+                _selectedCategory = null;
+              });
+              setSheetState(() {});
+            }
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Filters', style: theme.textTheme.titleLarge),
+                  const SizedBox(height: 20),
+                  Text('Provider', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 10),
+                  Column(
+                    key: const Key('filterProviderSection'),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: providerKeys.map((key) {
+                          final selected = key == _selectedProviderKey;
+                          final label = key == 'all'
+                              ? 'All (${vehicles.length})'
+                              : '${descriptorByKey[key]?.displayName ?? key} (${providerCounts[key]})';
+                          return _FilterChip(
+                            label: label,
+                            selected: selected,
+                            showCheck: true,
+                            onTap: () => applyProvider(key),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Text('Category', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 10),
+                  Column(
+                    key: const Key('filterCategorySection'),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _FilterChip(
+                            label: 'All (${vehicles.length})',
+                            selected: _selectedCategory == null,
+                            onTap: () => applyCategory(null),
+                          ),
+                          ...categories.map(
+                            (category) => _FilterChip(
+                              label:
+                                  '${category.label} (${categoryCounts[category]})',
+                              selected: _selectedCategory == category,
+                              icon: category.icon,
+                              onTap: () => applyCategory(category),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: clearAll,
+                        child: const Text('Clear all'),
+                      ),
+                      const Spacer(),
+                      FilledButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Done'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }
 
@@ -688,204 +813,95 @@ class _SummaryStrip extends StatelessWidget {
   }
 }
 
-/// Horizontal provider filter chips: All + one per provider in the fleet.
-class _ProviderFilterChips extends StatelessWidget {
-  const _ProviderFilterChips({
-    required this.vehicles,
-    required this.descriptors,
-    required this.selectedKey,
-    required this.onSelected,
-  });
-
-  final List<Vehicle> vehicles;
-  final Map<String, ProviderDescriptor> descriptors;
-  final String selectedKey;
-  final void Function(String key) onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final counts = <String, int>{};
-    for (final v in vehicles) {
-      counts[v.providerKey] = (counts[v.providerKey] ?? 0) + 1;
-    }
-    final keys = ['all', ...counts.keys.toList()..sort()];
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Row(
-        children: keys.map((key) {
-          final selected = key == selectedKey;
-          final label = key == 'all'
-              ? 'All (${vehicles.length})'
-              : '${descriptors[key]?.displayName ?? key} (${counts[key]})';
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: GestureDetector(
-              onTap: () => onSelected(key),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? theme.colorScheme.secondaryContainer
-                      : theme.colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: selected
-                        ? Colors.transparent
-                        : theme.colorScheme.outlineVariant,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (selected) ...[
-                      Icon(
-                        Icons.check,
-                        size: 16,
-                        color: theme.colorScheme.onSecondaryContainer,
-                      ),
-                      const SizedBox(width: 4),
-                    ],
-                    Text(
-                      label,
-                      style: TextStyle(
-                        color: selected
-                            ? theme.colorScheme.onSecondaryContainer
-                            : theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-/// Vehicle-type filter chips: All + one per category present in the
-/// fleet, with counts. Combines with the search, status and provider
-/// filters — a vehicle must pass all of them to show.
-class _CategoryFilterChips extends StatelessWidget {
-  const _CategoryFilterChips({
-    required this.vehicles,
+/// One pill filter chip (shared by the compact status bar and the
+/// Filters sheet): secondaryContainer + onSecondaryContainer when
+/// selected, surfaceContainerLow + outlineVariant border when not.
+/// An optional leading [icon] (category chips) or a check mark when
+/// [showCheck] and selected (provider chips).
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
     required this.selected,
-    required this.onSelected,
+    required this.onTap,
+    this.icon,
+    this.showCheck = false,
   });
 
-  final List<Vehicle> vehicles;
-  final VehicleCategory? selected;
-  final void Function(VehicleCategory?) onSelected;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final bool showCheck;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final counts = <VehicleCategory, int>{};
-    for (final v in vehicles) {
-      counts[v.category] = (counts[v.category] ?? 0) + 1;
-    }
-    final categories = VehicleCategory.values
-        .where((c) => counts.containsKey(c))
-        .toList();
-    if (categories.isEmpty) return const SizedBox.shrink();
-    Widget chip({
-      required Widget label,
-      required bool isSelected,
-      required VoidCallback onTap,
-    }) {
-      return Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? theme.colorScheme.secondaryContainer
-                  : theme.colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: isSelected
-                    ? Colors.transparent
-                    : theme.colorScheme.outlineVariant,
-              ),
-            ),
-            child: DefaultTextStyle(
+    final foreground = selected
+        ? theme.colorScheme.onSecondaryContainer
+        : theme.colorScheme.onSurfaceVariant;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? theme.colorScheme.secondaryContainer
+              : theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? Colors.transparent
+                : theme.colorScheme.outlineVariant,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected && showCheck) ...[
+              Icon(Icons.check, size: 16, color: foreground),
+              const SizedBox(width: 4),
+            ],
+            if (icon != null) ...[
+              Icon(icon, size: 18, color: foreground),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
               style: TextStyle(
-                color: isSelected
-                    ? theme.colorScheme.onSecondaryContainer
-                    : theme.colorScheme.onSurfaceVariant,
+                color: foreground,
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
               ),
-              child: IconTheme(
-                data: IconThemeData(
-                  size: 18,
-                  color: isSelected
-                      ? theme.colorScheme.onSecondaryContainer
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-                child: label,
-              ),
             ),
-          ),
+          ],
         ),
-      );
-    }
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Row(
-        children: [
-          chip(
-            label: Text('All (${vehicles.length})'),
-            isSelected: selected == null,
-            onTap: () => onSelected(null),
-          ),
-          ...categories.map(
-            (category) => chip(
-              label: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(category.icon),
-                  const SizedBox(width: 6),
-                  Text('${category.label} (${counts[category]})'),
-                ],
-              ),
-              isSelected: selected == category,
-              onTap: () => onSelected(category),
-            ),
-          ),
-        ],
       ),
     );
   }
 }
 
-/// Status filter chips: All / Live / Idle / Offline, with counts.
+/// One compact filter bar (v1.3.1): the status chips scroll
+/// horizontally in a single ~48px row, with a tune button at the
+/// end that opens the Filters sheet (provider + category). The
+/// badge on the tune button counts the active non-"All"
+/// provider/category filters (hidden while none are active).
 ///
-/// They use the same taxonomy as the summary strip above and the
-/// status badge on each card — Live = ignition on, Idle = ignition
-/// off, Offline = no fix / expired — and write the same filter
-/// state as the tappable summary strip, so a chip and its summary
-/// stat always select the same vehicles.
-class _StatusFilterChips extends StatelessWidget {
-  const _StatusFilterChips({
+/// Provider and category chips used to be two more full rows here —
+/// three rows of chips pushed the vehicle cards off the screen, so
+/// they moved into the sheet. Status stays in the bar because it
+/// mirrors the summary strip taps above: same taxonomy
+/// (Live = ignition on, Idle = ignition off, Offline = no fix /
+/// expired) and the same filter state.
+class _FilterBar extends StatelessWidget {
+  const _FilterBar({
     required this.total,
     required this.live,
     required this.idle,
     required this.offline,
     required this.selectedStatuses,
-    required this.onSelect,
+    required this.onSelectStatus,
+    required this.activeFilterCount,
+    required this.onOpenFilters,
   });
 
   final int total;
@@ -893,7 +909,9 @@ class _StatusFilterChips extends StatelessWidget {
   final int idle;
   final int offline;
   final Set<VehicleStatus>? selectedStatuses;
-  final void Function(Set<VehicleStatus>? statuses) onSelect;
+  final void Function(Set<VehicleStatus>? statuses) onSelectStatus;
+  final int activeFilterCount;
+  final VoidCallback onOpenFilters;
 
   bool get _allSelected => selectedStatuses == null;
 
@@ -906,69 +924,78 @@ class _StatusFilterChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    Widget chip(
-      String label,
-      int count,
-      bool selected,
-      VoidCallback onTap,
-    ) {
-      return Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: selected
-                  ? theme.colorScheme.secondaryContainer
-                  : theme.colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: selected
-                    ? Colors.transparent
-                    : theme.colorScheme.outlineVariant,
-              ),
-            ),
-            child: Text(
-              '$label ($count)',
-              style: TextStyle(
-                color: selected
-                    ? theme.colorScheme.onSecondaryContainer
-                    : theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ),
+    Widget tuneButton = IconButton(
+      icon: const Icon(Icons.tune),
+      tooltip: 'Filters',
+      onPressed: onOpenFilters,
+      style: IconButton.styleFrom(
+        backgroundColor: activeFilterCount > 0
+            ? theme.colorScheme.secondaryContainer
+            : theme.colorScheme.surfaceContainer,
+        foregroundColor: activeFilterCount > 0
+            ? theme.colorScheme.onSecondaryContainer
+            : theme.colorScheme.onSurface,
+      ),
+    );
+    if (activeFilterCount > 0) {
+      tuneButton = Badge(
+        key: const Key('filterBadge'),
+        // M3 badge, but in the theme's primary (not the error red —
+        // the badge means "filters active", not an error).
+        backgroundColor: theme.colorScheme.primary,
+        textColor: theme.colorScheme.onPrimary,
+        label: Text('$activeFilterCount'),
+        child: tuneButton,
       );
     }
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Row(
-        children: [
-          chip('All', total, _allSelected, () => onSelect(null)),
-          chip(
-            'Live',
-            live,
-            _isSelected({VehicleStatus.live}),
-            () => onSelect({VehicleStatus.live}),
-          ),
-          chip(
-            'Idle',
-            idle,
-            _isSelected({VehicleStatus.idle}),
-            () => onSelect({VehicleStatus.idle}),
-          ),
-          chip(
-            'Offline',
-            offline,
-            _isSelected({VehicleStatus.unknown, VehicleStatus.expired}),
-            () => onSelect({VehicleStatus.unknown, VehicleStatus.expired}),
-          ),
-        ],
+      child: SizedBox(
+        height: 48,
+        child: Row(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _FilterChip(
+                      label: 'All ($total)',
+                      selected: _allSelected,
+                      onTap: () => onSelectStatus(null),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Live ($live)',
+                      selected: _isSelected({VehicleStatus.live}),
+                      onTap: () => onSelectStatus({VehicleStatus.live}),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Idle ($idle)',
+                      selected: _isSelected({VehicleStatus.idle}),
+                      onTap: () => onSelectStatus({VehicleStatus.idle}),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Offline ($offline)',
+                      selected: _isSelected({
+                        VehicleStatus.unknown,
+                        VehicleStatus.expired,
+                      }),
+                      onTap: () => onSelectStatus({
+                        VehicleStatus.unknown,
+                        VehicleStatus.expired,
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            tuneButton,
+          ],
+        ),
       ),
     );
   }

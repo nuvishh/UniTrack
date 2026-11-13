@@ -8,7 +8,7 @@ enum AuthType {
   userIdAndKey,
 
   /// An account username plus an account password
-  /// (MercyDataTrack, PauldeaTrack).
+  /// (Mercydatrack, PauldeaTrack).
   usernamePassword,
 }
 
@@ -17,8 +17,8 @@ enum AuthType {
 ///
 /// [verified] marks the providers whose API contract was tested live
 /// against the real API (2026-11-09 for LiveTrace, SimplyTrack,
-/// HashTrace and Aargee; 2026-11-11 for MercyDataTrack, PauldeaTrack
-/// and Transight; 2026-11-12 for MercyDataTrack 4G). All 8 providers
+/// HashTrace and Aargee; 2026-11-11 for Mercydatrack, PauldeaTrack
+/// and Transight; 2026-11-12 for Mercydatrack 4G). All 8 providers
 /// are now live-verified.
 enum GpsProvider {
   transight(
@@ -64,7 +64,7 @@ enum GpsProvider {
   ),
   mercydatrack(
     key: 'mercydatrack',
-    displayName: 'MercyDataTrack',
+    displayName: 'Mercydatrack',
     authType: AuthType.usernamePassword,
     deviceIdLabel: 'Vehicle Registration',
     deviceIdHint: 'Registration number, e.g. KL00XX0000',
@@ -77,7 +77,7 @@ enum GpsProvider {
   ),
   mercydatrack4g(
     key: 'mercydatrack4g',
-    displayName: 'MercyDataTrack (4G)',
+    displayName: 'Mercydatrack (4G)',
     authType: AuthType.usernamePassword,
     deviceIdLabel: 'Vehicle Registration',
     deviceIdHint: 'Registration number, or chassis number (4G devices)',

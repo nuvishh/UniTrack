@@ -33,9 +33,9 @@ void main() {
     });
 
     test('only live-snapshot providers lack history support', () {
-      // Live snapshots only: HashTrace, LiveTrace, MercyDataTrack and
+      // Live snapshots only: HashTrace, LiveTrace, Mercydatrack and
       // PauldeaTrack (no history endpoint verified for the last two),
-      // plus MercyDataTrack (4G), whose endpoint returns today's
+      // plus Mercydatrack (4G), whose endpoint returns today's
       // track but no server-side history API.
       expect(GpsProvider.hashtrace.supportsHistory, isFalse);
       expect(GpsProvider.radiant.supportsHistory, isFalse);
@@ -70,7 +70,7 @@ void main() {
 
     test('verified flags match the live checks', () {
       // Verified live 2026-11-09: LiveTrace, SimplyTrack, HashTrace,
-      // Aargee. Verified live 2026-11-11: MercyDataTrack, PauldeaTrack,
+      // Aargee. Verified live 2026-11-11: Mercydatrack, PauldeaTrack,
       // Transight. All 7 providers are now live-verified.
       expect(GpsProvider.radiant.verified, isTrue);
       expect(GpsProvider.voltysoft.verified, isTrue);

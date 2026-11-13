@@ -621,7 +621,7 @@ class SettingsScreen extends ConsumerWidget {
                           children: [
                             Text('UniTrack', style: theme.textTheme.titleLarge),
                             Text(
-                              'Version 1.3.0 (build 14)',
+                              'Version 1.3.1 (build 15)',
                               style: theme.textTheme.bodySmall,
                             ),
                           ],
@@ -632,7 +632,7 @@ class SettingsScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   Text(
                     'Universal GPS tracker — one fleet across Transight, '
-                    'Aargee, LiveTrace, MercyDataTrack, MercyDataTrack '
+                    'Aargee, LiveTrace, Mercydatrack, Mercydatrack '
                     '(4G), PauldeaTrack, SimplyTrack and HashTrace.',
                     style: theme.textTheme.bodyMedium,
                   ),

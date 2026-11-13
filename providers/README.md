@@ -20,8 +20,8 @@ never breaks when offline.
 ## Rules (enforced in code)
 
 1. **Built-ins are the source of truth.** The 8 shipped providers
-   (LiveTrace, SimplyTrack, HashTrace, Aargee, MercyDataTrack,
-   MercyDataTrack (4G), PauldeaTrack, Transight) are served by their
+   (LiveTrace, SimplyTrack, HashTrace, Aargee, Mercydatrack,
+   Mercydatrack (4G), PauldeaTrack, Transight) are served by their
    built-in Dart clients.
    A registry entry can override a built-in's `baseUrl`/endpoints
    **only** when it is marked `"genericCompatible": true` **and**

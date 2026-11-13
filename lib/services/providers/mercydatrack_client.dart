@@ -8,7 +8,7 @@ import '../../models/vehicle.dart';
 import '../../utils/parsing.dart';
 import 'gps_provider_client.dart';
 
-/// MercyDataTrack client.
+/// Mercydatrack client.
 ///
 /// VERIFIED LIVE 2026-11-11.
 /// - Base: https://klconsole.mercydatrack.com/mtrack
@@ -39,7 +39,7 @@ class MercyDataTrackClient extends GpsProviderClient {
     final colon = secret.indexOf(':');
     if (colon <= 0 || colon == secret.length - 1) {
       throw ProviderException(
-        'MercyDataTrack needs the login as username:password — '
+        'Mercydatrack needs the login as username:password — '
         'put the account username, a colon, then the password in the '
         'secret field.',
       );
@@ -70,25 +70,25 @@ class MercyDataTrackClient extends GpsProviderClient {
           .timeout(const Duration(seconds: 20));
       if (response.statusCode != 200) {
         throw ProviderException(
-          'MercyDataTrack returned HTTP ${response.statusCode}.',
+          'Mercydatrack returned HTTP ${response.statusCode}.',
         );
       }
       final decoded = jsonDecode(response.body);
       if (decoded is! Map<String, dynamic>) {
         throw ProviderException(
-          'MercyDataTrack returned an unexpected response.',
+          'Mercydatrack returned an unexpected response.',
         );
       }
       if (decoded['status'] != 'success') {
         throw ProviderException(
-          'MercyDataTrack reported an error — check the username, '
+          'Mercydatrack reported an error — check the username, '
           'password and vehicle registration.',
         );
       }
       final data = decoded['data'];
       if (data is! Map<String, dynamic>) {
         throw ProviderException(
-          'MercyDataTrack returned no vehicle data — check the '
+          'Mercydatrack returned no vehicle data — check the '
           'vehicle registration.',
         );
       }
@@ -99,7 +99,7 @@ class MercyDataTrackClient extends GpsProviderClient {
       if (deviceId.isNotEmpty &&
           normalizeRegNo(vehicle.displayName) != normalizeRegNo(deviceId)) {
         throw ProviderException(
-          'MercyDataTrack found no vehicle with registration '
+          'Mercydatrack found no vehicle with registration '
           '"$deviceId" — check the vehicle registration number.',
         );
       }

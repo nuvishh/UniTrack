@@ -211,7 +211,7 @@
       "deviceIdHint": "Registration number, e.g. KL00XX0000",
       "deviceIdLabel": "Vehicle Registration",
       "deviceMatching": "strict",
-      "displayName": "MercyDataTrack",
+      "displayName": "Mercydatrack",
       "fields": {
         "displayName": "vehicle_registration",
         "falseValues": [
@@ -270,7 +270,7 @@
       "deviceIdHint": "Registration number, or chassis number (4G devices)",
       "deviceIdLabel": "Vehicle Registration",
       "deviceMatching": "strict",
-      "displayName": "MercyDataTrack (4G)",
+      "displayName": "Mercydatrack (4G)",
       "fields": {
         "displayName": "vehicle_registration",
         "falseValues": [

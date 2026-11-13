@@ -43,7 +43,7 @@ DateTime? parseDateTime(dynamic value) {
 }
 
 /// Parses a "dd-MM-yyyy hh:mm:ss AM/PM" timestamp — the `source_date`
-/// format of MercyDataTrack and PauldeaTrack, e.g.
+/// format of Mercydatrack and PauldeaTrack, e.g.
 /// "11-11-2026 03:34:32 PM". Returns null when the value is missing or
 /// unparseable. Like the other providers' times, it carries no timezone
 /// marker, so it is parsed as local time.

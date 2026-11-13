@@ -9,7 +9,7 @@ import '../../utils/parsing.dart';
 import 'gps_provider_client.dart';
 import 'mercydatrack_client.dart';
 
-/// MercyDataTrack client for 4G devices (proconsole).
+/// Mercydatrack client for 4G devices (proconsole).
 ///
 /// VERIFIED LIVE 2026-11-12.
 /// - Base: https://proconsole.mercydatrack.com/mtrack
@@ -62,25 +62,25 @@ class MercyDataTrack4GClient extends GpsProviderClient {
           .timeout(const Duration(seconds: 20));
       if (response.statusCode != 200) {
         throw ProviderException(
-          'MercyDataTrack (4G) returned HTTP ${response.statusCode}.',
+          'Mercydatrack (4G) returned HTTP ${response.statusCode}.',
         );
       }
       final decoded = jsonDecode(response.body);
       if (decoded is! Map<String, dynamic>) {
         throw ProviderException(
-          'MercyDataTrack (4G) returned an unexpected response.',
+          'Mercydatrack (4G) returned an unexpected response.',
         );
       }
       if (decoded['status'] != 'success') {
         throw ProviderException(
-          'MercyDataTrack (4G) reported an error — check the username, '
+          'Mercydatrack (4G) reported an error — check the username, '
           'password and vehicle registration.',
         );
       }
       final data = decoded['data'];
       if (data is! Map<String, dynamic>) {
         throw ProviderException(
-          'MercyDataTrack (4G) returned no vehicle data — check the '
+          'Mercydatrack (4G) returned no vehicle data — check the '
           'vehicle registration.',
         );
       }
@@ -91,7 +91,7 @@ class MercyDataTrack4GClient extends GpsProviderClient {
       if (deviceId.isNotEmpty &&
           normalizeRegNo(vehicle.displayName) != normalizeRegNo(deviceId)) {
         throw ProviderException(
-          'MercyDataTrack (4G) found no vehicle with registration '
+          'Mercydatrack (4G) found no vehicle with registration '
           '"$deviceId" — check the vehicle registration number.',
         );
       }
@@ -110,7 +110,7 @@ class MercyDataTrack4GClient extends GpsProviderClient {
     final points = json['data'];
     if (points is! List || points.isEmpty) {
       throw ProviderException(
-        'MercyDataTrack (4G) returned no points for vehicle "$reg".',
+        'Mercydatrack (4G) returned no points for vehicle "$reg".',
       );
     }
     // Points arrive newest-first, but pick the latest by parsed time
@@ -131,7 +131,7 @@ class MercyDataTrack4GClient extends GpsProviderClient {
     }
     if (latest == null) {
       throw ProviderException(
-        'MercyDataTrack (4G) returned no usable points for vehicle '
+        'Mercydatrack (4G) returned no usable points for vehicle '
         '"$reg".',
       );
     }

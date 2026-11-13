@@ -87,6 +87,14 @@ Future<void> _pumpFleet(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 100));
 }
 
+/// Opens the Filters bottom sheet via the tune button in the
+/// compact filter bar, and lets its entrance animation finish.
+Future<void> _openFilterSheet(WidgetTester tester) async {
+  await tester.tap(find.byIcon(Icons.tune));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+}
+
 /// A fleet card's reg no — scoped to the list, because the same text
 /// also sits in the search field once a query is typed.
 Finder _card(String regNo) => find.descendant(
@@ -98,10 +106,17 @@ void main() {
   testWidgets('category chips filter the fleet', (tester) async {
     await _pumpFleet(tester);
 
-    // All three cards + all three category chips render.
+    // All three cards render; the category chips are NOT on the
+    // Fleet screen any more (v1.3.1) — they live in the Filters
+    // sheet behind the tune button.
     expect(_card('KL00XX0001'), findsOneWidget);
     expect(_card('KL00XX0002'), findsOneWidget);
     expect(_card('KL00XX0003'), findsOneWidget);
+    expect(find.text('Bus (1)'), findsNothing);
+    expect(find.text('Car (1)'), findsNothing);
+    expect(find.text('Truck (1)'), findsNothing);
+
+    await _openFilterSheet(tester);
     expect(find.text('Bus (1)'), findsOneWidget);
     expect(find.text('Car (1)'), findsOneWidget);
     expect(find.text('Truck (1)'), findsOneWidget);
@@ -121,9 +136,14 @@ void main() {
     expect(_card('KL00XX0002'), findsOneWidget);
     expect(_card('KL00XX0001'), findsNothing);
 
-    // 'All (3)' appears in three chip rows (provider, category,
-    // status, in that order) — the category row's is the middle one.
-    await tester.tap(find.text('All (3)').at(1));
+    // The sheet holds two 'All (3)' chips (provider + category)
+    // and the bar a third — the category section's is scoped by key.
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('filterCategorySection')),
+        matching: find.text('All (3)'),
+      ),
+    );
     await tester.pump();
     expect(_card('KL00XX0001'), findsOneWidget);
     expect(_card('KL00XX0002'), findsOneWidget);
@@ -139,6 +159,7 @@ void main() {
     expect(_card('KL00XX0001'), findsNothing);
 
     // Search narrows to the car, but the Bus filter excludes it.
+    await _openFilterSheet(tester);
     await tester.tap(find.text('Bus (1)'));
     await tester.pump();
     expect(find.text('No matches'), findsOneWidget);
@@ -159,6 +180,7 @@ void main() {
     expect(_card('KL00XX0001'), findsNothing);
 
     // Bus filter + Idle status = nothing matches.
+    await _openFilterSheet(tester);
     await tester.tap(find.text('Bus (1)'));
     await tester.pump();
     expect(find.text('No matches'), findsOneWidget);
@@ -181,6 +203,11 @@ void main() {
     expect(find.text('Offline (1)'), findsOneWidget);
     expect(find.text('Stopped (1)'), findsNothing);
     expect(find.text('Moving (1)'), findsNothing);
+    // Status chips stay in the compact bar; provider/category chips
+    // are in the sheet, not on the screen.
+    expect(find.byIcon(Icons.tune), findsOneWidget);
+    expect(find.text('Bus (1)'), findsNothing);
+    expect(find.text('Aargee GPS (1)'), findsNothing);
 
     // The Idle chip shows the ignition-off car (its card badge also
     // reads Idle), and the Live chip shows only the bus.
@@ -190,18 +217,72 @@ void main() {
     expect(_card('KL00XX0001'), findsNothing);
     expect(_card('KL00XX0003'), findsNothing);
 
-    await tester.tap(find.text('All (3)').at(2));
+    // 'All (3)' is unique while the sheet is closed — it is only
+    // the bar's status chip now.
+    await tester.tap(find.text('All (3)'));
     await tester.pump();
     await tester.tap(find.text('Live (1)'));
     await tester.pump();
     expect(_card('KL00XX0001'), findsOneWidget);
     expect(_card('KL00XX0002'), findsNothing);
 
-    await tester.tap(find.text('All (3)').at(2));
+    await tester.tap(find.text('All (3)'));
     await tester.pump();
     await tester.tap(find.text('Offline (1)'));
     await tester.pump();
     expect(_card('KL00XX0003'), findsOneWidget);
     expect(_card('KL00XX0001'), findsNothing);
+  });
+
+  testWidgets(
+      'provider chips live in the filter sheet, not on the fleet screen',
+      (tester) async {
+    await _pumpFleet(tester);
+
+    // No provider or category chips on the Fleet screen by default
+    // (v1.3.1) — only the status chips in the compact bar.
+    expect(find.text('Aargee GPS (1)'), findsNothing);
+    expect(find.text('HashTrace Tracker (1)'), findsNothing);
+    expect(find.text('Transight GPS (1)'), findsNothing);
+    expect(find.text('Bus (1)'), findsNothing);
+    // The tune button is there, with no badge while no provider /
+    // category filter is active.
+    expect(find.byIcon(Icons.tune), findsOneWidget);
+    expect(find.byKey(const Key('filterBadge')), findsNothing);
+
+    await _openFilterSheet(tester);
+    expect(find.text('Filters'), findsOneWidget);
+    expect(find.text('Provider'), findsOneWidget);
+    expect(find.text('Category'), findsOneWidget);
+    expect(find.text('Aargee GPS (1)'), findsOneWidget);
+    expect(find.text('HashTrace Tracker (1)'), findsOneWidget);
+    expect(find.text('Transight GPS (1)'), findsOneWidget);
+    expect(find.text('Bus (1)'), findsOneWidget);
+
+    // Tapping a provider chip applies immediately — the fleet
+    // behind the sheet filters at once.
+    await tester.tap(find.text('Aargee GPS (1)'));
+    await tester.pump();
+    expect(_card('KL00XX0001'), findsOneWidget);
+    expect(_card('KL00XX0002'), findsNothing);
+    expect(_card('KL00XX0003'), findsNothing);
+    // One active filter → the tune button carries a badge.
+    expect(find.byKey(const Key('filterBadge')), findsOneWidget);
+
+    // Clear all resets provider + category (status untouched) and
+    // drops the badge; the whole fleet is back.
+    await tester.tap(find.text('Clear all'));
+    await tester.pump();
+    expect(_card('KL00XX0001'), findsOneWidget);
+    expect(_card('KL00XX0002'), findsOneWidget);
+    expect(_card('KL00XX0003'), findsOneWidget);
+    expect(find.byKey(const Key('filterBadge')), findsNothing);
+
+    // Done closes the sheet — a plain pump first to process the
+    // tap and start the dismiss animation, then 500ms to finish it.
+    await tester.tap(find.text('Done'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Filters'), findsNothing);
   });
 }

@@ -148,7 +148,7 @@ void main() {
      "auth": {"style": "body", "bodyField": "apikey", "secretFormat": "key"},
      "fleet": {"method": "GET", "path": "/fleet"},
      "fields": {"id": "id", "displayName": "name"}},
-    {"key": "mercydatrack4g", "displayName": "MercyDataTrack (4G)", "baseUrl": "https://proconsole.mercydatrack.com/mtrack",
+    {"key": "mercydatrack4g", "displayName": "Mercydatrack (4G)", "baseUrl": "https://proconsole.mercydatrack.com/mtrack",
      "auth": {"style": "query", "param": "username", "secretFormat": "username:password"},
      "fleet": {"method": "GET", "path": "/vehicle-data"},
      "fields": {"id": "id", "displayName": "name"}},

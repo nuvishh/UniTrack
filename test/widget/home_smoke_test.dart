@@ -159,6 +159,18 @@ void main() {
         expect(find.text('Alerts'), findsNothing);
         // The fleet empty state renders on the first tab.
         expect(find.text('No vehicles yet'), findsOneWidget);
+        // No "+ Add vehicle" button on the Fleet tab any more
+        // (v1.3.1) — the Add tab is the only entry point now.
+        expect(find.byType(FloatingActionButton), findsNothing);
+        expect(find.text('Add vehicle'), findsNothing);
+        // The Add tab still opens the wizard.
+        await tester.tap(find.text('Add'));
+        await tester.pump();
+        expect(find.text('Add vehicle'), findsOneWidget);
+        expect(
+          find.text('Which GPS provider is this vehicle on?'),
+          findsOneWidget,
+        );
       });
     }
   });

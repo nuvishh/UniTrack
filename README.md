@@ -15,7 +15,7 @@ together.
 | Transight GPS | `transight` | API key | Yes | TODO — endpoints unverified |
 | Aargee GPS | `aargee` | API key | Yes | ✅ Verified live 2026-11-09 |
 | Radiant / LiveTrace | `radiant` | User ID + key | No (live only) | ✅ Verified live 2026-11-09 |
-| MercyDataTrack | `mercydatrack` | Username + password | Yes | TODO — endpoints unverified |
+| Mercydatrack | `mercydatrack` | Username + password | Yes | TODO — endpoints unverified |
 | PauldeaTrack | `pauldeatrack` | Username + password | Yes | TODO — endpoints unverified |
 | Voltysoft / SimplyTrack | `voltysoft` | `x-api-key` + user ID | Yes | ✅ Verified live 2026-11-09 |
 | HashTrace Tracker | `hashtrace` | Auth key (`authKey`) | No (live only) | ✅ Verified live 2026-11-09 |

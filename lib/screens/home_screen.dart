@@ -12,9 +12,10 @@ import 'settings_screen.dart';
 ///
 /// The tab index lives in [homeNavProvider] (not local state) so
 /// other screens can switch tabs — a fleet card's "Map" action opens
-/// the Map tab centred on that vehicle. The "Add vehicle" FAB shows
-/// only on the Fleet tab; the Add tab itself embeds the same wizard
-/// (saving there returns to Fleet instead of popping a route).
+/// the Map tab centred on that vehicle. The Add tab embeds the
+/// wizard (saving there returns to Fleet instead of popping a
+/// route); it is the only entry point to the wizard — the Fleet
+/// tab's "+ Add vehicle" button was removed in v1.3.1.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -34,19 +35,6 @@ class HomeScreen extends ConsumerWidget {
     final tabs = _tabs(ref);
     return Scaffold(
       body: IndexedStack(index: tab, children: tabs),
-      floatingActionButton: tab == 0
-          ? FloatingActionButton.extended(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const AddVehicleScreen(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Add vehicle'),
-            )
-          : null,
       bottomNavigationBar: NavigationBar(
         height: 80,
         selectedIndex: tab,

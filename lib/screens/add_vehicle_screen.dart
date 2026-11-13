@@ -340,27 +340,39 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
       child: SafeArea(
         top: false,
         child: switch (_step) {
+          // Step 0: one full-width Continue with a trailing arrow.
           0 => SizedBox(
             width: double.infinity,
-            child: FilledButton(
+            child: FilledButton.icon(
               onPressed: () => _goToStep(1),
-              child: const Text('Continue'),
+              icon: const Icon(Icons.arrow_forward),
+              iconAlignment: IconAlignment.end,
+              label: const Text('Continue'),
             ),
           ),
-          1 => Row(
+          // Step 1: the primary action is full-width like every
+          // other step — the old 1:2 Back/Continue split squeezed
+          // Continue next to Back and looked off. Back sits above
+          // it as a full-width outlined button (the AppBar back
+          // arrow does the same job).
+          1 => Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
+              SizedBox(
+                width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () => _goToStep(0),
                   child: const Text('Back'),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: FilledButton(
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
                   onPressed: _continueFromDetails,
-                  child: const Text('Continue'),
+                  icon: const Icon(Icons.arrow_forward),
+                  iconAlignment: IconAlignment.end,
+                  label: const Text('Continue'),
                 ),
               ),
             ],
