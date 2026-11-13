@@ -48,6 +48,7 @@ class HomeScreen extends ConsumerWidget {
             )
           : null,
       bottomNavigationBar: NavigationBar(
+        height: 80,
         selectedIndex: tab,
         onDestinationSelected: (index) =>
             ref.read(homeNavProvider.notifier).goToTab(index),

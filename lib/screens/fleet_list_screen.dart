@@ -191,15 +191,15 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
         title: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: theme.colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.location_on,
-                color: Colors.white,
+                color: theme.colorScheme.onPrimaryContainer,
                 size: 22,
               ),
             ),
@@ -222,17 +222,27 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
         ),
         actions: [
           IconButton(
+            style: IconButton.styleFrom(
+              backgroundColor: theme.colorScheme.surfaceContainer,
+              foregroundColor: theme.colorScheme.onSurface,
+            ),
             icon: Icon(
               isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
             ),
             tooltip: isDark ? 'Switch to light theme' : 'Switch to dark theme',
             onPressed: _toggleTheme,
           ),
+          const SizedBox(width: 6),
           IconButton(
+            style: IconButton.styleFrom(
+              backgroundColor: theme.colorScheme.secondaryContainer,
+              foregroundColor: theme.colorScheme.onSecondaryContainer,
+            ),
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh now',
             onPressed: _refresh,
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: Column(
@@ -243,7 +253,6 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
             offline: offlineCount,
             lastRefreshed: _lastRefreshed,
             isRefreshing: isRefreshing,
-            onRefresh: _refresh,
             selectedStatuses: _selectedStatuses,
             onStatTap: (statuses) => setState(() {
               final same =
@@ -260,6 +269,12 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search by reg no, IMEI or provider',
+                filled: true,
+                fillColor: theme.colorScheme.surfaceContainerHigh,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchQuery.isEmpty
                     ? null
@@ -271,6 +286,21 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
                           setState(() => _searchQuery = '');
                         },
                       ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  borderSide: BorderSide(
+                    color: theme.colorScheme.primary,
+                    width: 2,
+                  ),
+                ),
               ),
               onChanged: (value) => setState(() => _searchQuery = value.trim()),
             ),
@@ -480,8 +510,10 @@ class _ScrollableEmptyState extends StatelessWidget {
   }
 }
 
-/// Bold gradient strip on top of the fleet: live / idle / offline
-/// counts at a glance, plus when the fleet was last refreshed.
+/// Tonal fleet summary (Material You, v1.3.0): a primary-container
+/// card with Live / Idle / Offline stat tiles in surfaceContainerLowest
+/// (light) / surfaceContainerLow (dark), as in the prototype. No
+/// gradient — the old indigo strip is gone.
 ///
 /// The three counts are tappable: tap one to filter the list to that
 /// status, tap it again to clear the filter.
@@ -492,7 +524,6 @@ class _SummaryStrip extends StatelessWidget {
     required this.offline,
     required this.lastRefreshed,
     required this.isRefreshing,
-    required this.onRefresh,
     required this.selectedStatuses,
     required this.onStatTap,
   });
@@ -502,7 +533,6 @@ class _SummaryStrip extends StatelessWidget {
   final int offline;
   final DateTime? lastRefreshed;
   final bool isRefreshing;
-  final VoidCallback onRefresh;
   final Set<VehicleStatus>? selectedStatuses;
   final void Function(Set<VehicleStatus> statuses) onStatTap;
 
@@ -513,6 +543,8 @@ class _SummaryStrip extends StatelessWidget {
     Color dot,
     Set<VehicleStatus> statuses,
   ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final selected =
         selectedStatuses != null &&
         selectedStatuses!.length == statuses.length &&
@@ -520,53 +552,56 @@ class _SummaryStrip extends StatelessWidget {
     return Expanded(
       child: InkWell(
         onTap: () => onStatTap(statuses),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: selected
-                ? Colors.white.withValues(alpha: 0.22)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
+            color: isDark
+                ? theme.colorScheme.surfaceContainerLow
+                : theme.colorScheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: selected
-                  ? Colors.white.withValues(alpha: 0.6)
+                  ? theme.colorScheme.primary
                   : Colors.transparent,
+              width: 2,
             ),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 10,
-                    height: 10,
+                    width: 8,
+                    height: 8,
                     decoration: BoxDecoration(
                       color: dot,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '$count',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      height: 1,
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
-                label,
+                '$count',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onSurface,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
                 ),
               ),
             ],
@@ -578,88 +613,99 @@ class _SummaryStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final updated = lastRefreshed == null
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final updated = isRefreshing
+        ? 'Updating…'
+        : lastRefreshed == null
         ? 'Not updated yet'
         : 'Updated ${relativeTime(lastRefreshed)}';
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: AppColors.summaryGradient,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        // Prototype: primaryContainer at 55% in light, plain
+        // surfaceContainer in dark.
+        color: isDark
+            ? theme.colorScheme.surfaceContainer
+            : theme.colorScheme.primaryContainer.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
         ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.35),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
       ),
       child: Column(
         children: [
           Row(
             children: [
-              _stat(
-                context,
-                live,
-                'LIVE',
-                Colors.white,
-                {VehicleStatus.live},
+              PulsingDot(color: AppColors.live, pulsing: live > 0),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Multi-API Telemetry',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isDark
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onPrimaryContainer,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-              _stat(
-                context,
-                idle,
-                'IDLE',
-                AppColors.accent,
-                {VehicleStatus.idle},
-              ),
-              _stat(
-                context,
-                offline,
-                'OFFLINE',
-                Colors.white70,
-                {VehicleStatus.unknown, VehicleStatus.expired},
+              const SizedBox(width: 8),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? theme.colorScheme.surfaceContainerHigh
+                        : theme.colorScheme.surfaceContainerLowest.withValues(
+                            alpha: 0.8,
+                          ),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    updated,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Row(
             children: [
-              Icon(
-                isRefreshing ? Icons.sync : Icons.check_circle_outline,
-                size: 18,
-                color: Colors.white.withValues(alpha: 0.9),
+              _stat(
+                context,
+                live,
+                'Live',
+                AppColors.live,
+                {VehicleStatus.live},
               ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  isRefreshing ? 'Updating…' : updated,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+              const SizedBox(width: 8),
+              _stat(
+                context,
+                idle,
+                'Idle',
+                AppColors.idle,
+                {VehicleStatus.idle},
               ),
-              InkWell(
-                onTap: onRefresh,
-                borderRadius: BorderRadius.circular(999),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.refresh,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
+              const SizedBox(width: 8),
+              _stat(
+                context,
+                offline,
+                'Offline',
+                AppColors.unknown,
+                {VehicleStatus.unknown, VehicleStatus.expired},
               ),
             ],
           ),
@@ -700,9 +746,6 @@ class _ProviderFilterChips extends StatelessWidget {
           final label = key == 'all'
               ? 'All (${vehicles.length})'
               : '${descriptors[key]?.displayName ?? key} (${counts[key]})';
-          final color = key == 'all'
-              ? theme.colorScheme.primary
-              : AppColors.providerColor(key);
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: GestureDetector(
@@ -714,19 +757,37 @@ class _ProviderFilterChips extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: selected
-                      ? color
-                      : theme.colorScheme.surfaceContainerHighest,
+                      ? theme.colorScheme.secondaryContainer
+                      : theme.colorScheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  label,
-                  style: TextStyle(
+                  border: Border.all(
                     color: selected
-                        ? Colors.white
-                        : theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
+                        ? Colors.transparent
+                        : theme.colorScheme.outlineVariant,
                   ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (selected) ...[
+                      Icon(
+                        Icons.check,
+                        size: 16,
+                        color: theme.colorScheme.onSecondaryContainer,
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: selected
+                            ? theme.colorScheme.onSecondaryContainer
+                            : theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -775,15 +836,20 @@ class _CategoryFilterChips extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: isSelected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.surfaceContainerHighest,
+                  ? theme.colorScheme.secondaryContainer
+                  : theme.colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: isSelected
+                    ? Colors.transparent
+                    : theme.colorScheme.outlineVariant,
+              ),
             ),
             child: DefaultTextStyle(
               style: TextStyle(
                 color: isSelected
-                    ? Colors.white
-                    : theme.colorScheme.onSurface,
+                    ? theme.colorScheme.onSecondaryContainer
+                    : theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
               ),
@@ -791,8 +857,8 @@ class _CategoryFilterChips extends StatelessWidget {
                 data: IconThemeData(
                   size: 18,
                   color: isSelected
-                      ? Colors.white
-                      : theme.colorScheme.onSurface,
+                      ? theme.colorScheme.onSecondaryContainer
+                      : theme.colorScheme.onSurfaceVariant,
                 ),
                 child: label,
               ),
@@ -882,16 +948,21 @@ class _StatusFilterChips extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: selected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.surfaceContainerHighest,
+                  ? theme.colorScheme.secondaryContainer
+                  : theme.colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: selected
+                    ? Colors.transparent
+                    : theme.colorScheme.outlineVariant,
+              ),
             ),
             child: Text(
               '$label ($count)',
               style: TextStyle(
                 color: selected
-                    ? Colors.white
-                    : theme.colorScheme.onSurface,
+                    ? theme.colorScheme.onSecondaryContainer
+                    : theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
               ),
@@ -944,13 +1015,13 @@ class _InlineErrorBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.expired.withValues(alpha: 0.1),
+        color: AppColors.error.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.expired.withValues(alpha: 0.35)),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.35)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_outlined, color: AppColors.expired),
+          const Icon(Icons.warning_amber_outlined, color: AppColors.error),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1032,158 +1103,151 @@ class _VehicleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final ignition = vehicle.ignition == null
-        ? 'Ignition unknown'
-        : vehicle.ignition!
-        ? 'Ignition on'
-        : 'Ignition off';
-    final ignitionColor = vehicle.ignition == null
-        ? theme.colorScheme.onSurfaceVariant
-        : vehicle.ignition!
-        ? AppColors.live
-        : AppColors.idle;
+    final ignitionOn = vehicle.ignition == true;
+    final ignitionUnknown = vehicle.ignition == null;
+    final speedIsLive = vehicle.status == VehicleStatus.live;
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 5,
-                color: AppColors.statusColor(vehicle.status),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          VehicleCategoryIcon(
-                            category: vehicle.category,
-                            size: 22,
-                            color: AppColors.statusColor(vehicle.status),
-                            tileColor: AppColors.statusColor(
-                              vehicle.status,
-                            ).withValues(alpha: 0.12),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              vehicle.displayName,
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                          ),
-                          VehicleStatusChip(status: vehicle.status),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          ProviderBadge(providerKey: vehicle.providerKey),
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.power_settings_new,
-                            size: 16,
-                            color: ignitionColor,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            ignition,
-                            style: TextStyle(
-                              color: ignitionColor,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          if (vehicle.speedKmph != null) ...[
-                            Text(
-                              vehicle.speedKmph!.toStringAsFixed(0),
-                              style: theme.textTheme.displayMedium?.copyWith(
-                                fontSize: 36,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 4),
-                              child: Text(
-                                'km/h',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                          ] else
-                            Text(
-                              '—',
-                              style: theme.textTheme.displayMedium?.copyWith(
-                                fontSize: 36,
-                              ),
-                            ),
-                          // The trailing "last updated" label is long
-                          // ("Last update unknown"); let it truncate
-                          // instead of overflowing on narrow screens.
-                          Flexible(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  lastUpdatedLabel(vehicle),
-                                  style: theme.textTheme.bodySmall,
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                ),
-                                const SizedBox(height: 2),
-                                Icon(
-                                  Icons.chevron_right,
-                                  color:
-                                      theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      const Divider(height: 1),
-                      Row(
-                        children: [
-                          _action(
-                            context,
-                            Icons.navigation_outlined,
-                            'Navigate',
-                            onNavigate,
-                          ),
-                          _action(
-                            context,
-                            Icons.share_outlined,
-                            'Share',
-                            onShare,
-                          ),
-                          _action(
-                            context,
-                            Icons.map_outlined,
-                            'Map',
-                            onMap,
-                          ),
-                        ],
-                      ),
-                    ],
+              Row(
+                children: [
+                  VehicleCategoryIcon(
+                    category: vehicle.category,
+                    size: 22,
+                    color: AppColors.statusColor(vehicle.status),
+                    tileColor: AppColors.statusColor(
+                      vehicle.status,
+                    ).withValues(alpha: 0.12),
                   ),
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      vehicle.displayName,
+                      style: AppTheme.mono(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  VehicleStatusChip(status: vehicle.status),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  ProviderBadge(providerKey: vehicle.providerKey),
+                  const SizedBox(width: 8),
+                  // Tonal IGN chip (prototype): secondaryContainer
+                  // when on, surfaceContainer when off / unknown.
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: ignitionOn
+                          ? theme.colorScheme.secondaryContainer
+                          : theme.colorScheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      ignitionUnknown
+                          ? 'IGN ?'
+                          : ignitionOn
+                          ? 'IGN ON'
+                          : 'IGN OFF',
+                      style: TextStyle(
+                        color: ignitionOn
+                            ? theme.colorScheme.onSecondaryContainer
+                            : theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (vehicle.speedKmph != null) ...[
+                    Text(
+                      vehicle.speedKmph!.toStringAsFixed(0),
+                      style: theme.textTheme.displayMedium?.copyWith(
+                        fontSize: 36,
+                        color: speedIsLive
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        'km/h',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ] else
+                    Text(
+                      '—',
+                      style: theme.textTheme.displayMedium?.copyWith(
+                        fontSize: 36,
+                      ),
+                    ),
+                  // The trailing "last updated" label is long
+                  // ("Last update unknown"); let it truncate
+                  // instead of overflowing on narrow screens.
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          lastUpdatedLabel(vehicle),
+                          style: theme.textTheme.bodySmall,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                        const SizedBox(height: 2),
+                        Icon(
+                          Icons.chevron_right,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              Row(
+                children: [
+                  _action(
+                    context,
+                    Icons.navigation_outlined,
+                    'Navigate',
+                    onNavigate,
+                  ),
+                  _action(
+                    context,
+                    Icons.share_outlined,
+                    'Share',
+                    onShare,
+                  ),
+                  _action(context, Icons.map_outlined, 'Map', onMap),
+                ],
               ),
             ],
           ),

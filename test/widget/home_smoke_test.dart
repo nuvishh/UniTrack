@@ -203,6 +203,13 @@ void main() {
       testWidgets('SettingsScreen at $label', (tester) async {
         await _pumpAtSize(tester, size, const SettingsScreen());
         expect(find.text('Settings'), findsOneWidget);
+        // The Colour theme picker (v1.3.0) pushes Backup & restore
+        // below the fold on a short screen — scroll it into view;
+        // offscreen ListView children are not built.
+        await tester.scrollUntilVisible(
+          find.text('Backup & restore'),
+          200,
+        );
         expect(find.text('Backup & restore'), findsOneWidget);
         // The About card sits below the fold in a ListView — scroll
         // it into view; offscreen ListView children are not built.

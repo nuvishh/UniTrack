@@ -391,10 +391,6 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                   onPressed: _testedOk && !_saving ? _save : null,
                   icon: const Icon(Icons.save_outlined),
                   label: Text(_saving ? 'Saving…' : 'Save vehicle'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.live,
-                    foregroundColor: Colors.white,
-                  ),
                 ),
               ),
               if (!_testedOk)
@@ -480,7 +476,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                                 ),
                                 // Registry-added providers carry a
                                 // "Remote" badge so they stand apart
-                                // from the 7 built-ins.
+                                // from the built-ins.
                                 if (descriptor.isRemote)
                                   Container(
                                     margin: const EdgeInsets.only(right: 6),
@@ -489,15 +485,17 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                                       vertical: 3,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: AppColors.primary.withValues(
-                                        alpha: 0.16,
-                                      ),
+                                      color: theme
+                                          .colorScheme
+                                          .secondaryContainer,
                                       borderRadius: BorderRadius.circular(999),
                                     ),
-                                    child: const Text(
+                                    child: Text(
                                       'Remote',
                                       style: TextStyle(
-                                        color: AppColors.primary,
+                                        color: theme
+                                            .colorScheme
+                                            .onSecondaryContainer,
                                         fontWeight: FontWeight.w800,
                                         fontSize: 11,
                                       ),
@@ -833,7 +831,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
           ),
         if (_testState == _TestState.error)
           Card(
-            color: AppColors.expired.withValues(alpha: 0.1),
+            color: AppColors.error.withValues(alpha: 0.1),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -844,7 +842,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                     children: [
                       const Icon(
                         Icons.error_outline,
-                        color: AppColors.expired,
+                        color: AppColors.error,
                         size: 26,
                       ),
                       const SizedBox(width: 12),
@@ -855,7 +853,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                             Text(
                               'Connection failed',
                               style: theme.textTheme.titleMedium?.copyWith(
-                                color: AppColors.expired,
+                                color: AppColors.error,
                               ),
                             ),
                             const SizedBox(height: 2),

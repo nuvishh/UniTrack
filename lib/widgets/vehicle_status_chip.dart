@@ -6,6 +6,12 @@ import '../utils/time_format.dart';
 
 /// Small coloured badge showing a vehicle's live state, with a pulsing
 /// dot while the vehicle is live so the fleet reads at a glance.
+///
+/// Material You (v1.3.0), as in the prototype's statusBadgeHTML: Live
+/// is emerald on a light emerald wash with dark emerald text in light
+/// mode (light emerald text in dark mode); Idle is amber the same way;
+/// Unknown / Expired are Offline — a surfaceContainerHigh pill with
+/// onSurfaceVariant text and an outline dot.
 class VehicleStatusChip extends StatelessWidget {
   const VehicleStatusChip({super.key, required this.status});
 
@@ -13,18 +19,40 @@ class VehicleStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (String label, Color color) = switch (status) {
-      VehicleStatus.live => ('Live', AppColors.live),
-      VehicleStatus.idle => ('Idle', AppColors.idle),
-      VehicleStatus.unknown => ('Unknown', AppColors.unknown),
-      VehicleStatus.expired => ('Expired', AppColors.expired),
-    };
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final (String label, Color color, Color textColor, Color wash) =
+        switch (status) {
+          VehicleStatus.live => (
+            'Live',
+            AppColors.live,
+            isDark ? AppColors.liveTextDark : AppColors.liveTextLight,
+            AppColors.live.withValues(alpha: 0.12),
+          ),
+          VehicleStatus.idle => (
+            'Idle',
+            AppColors.idle,
+            isDark ? AppColors.idleTextDark : AppColors.idleTextLight,
+            AppColors.idle.withValues(alpha: 0.15),
+          ),
+          VehicleStatus.unknown => (
+            'Unknown',
+            theme.colorScheme.outline,
+            theme.colorScheme.onSurfaceVariant,
+            theme.colorScheme.surfaceContainerHigh,
+          ),
+          VehicleStatus.expired => (
+            'Expired',
+            theme.colorScheme.outline,
+            theme.colorScheme.onSurfaceVariant,
+            theme.colorScheme.surfaceContainerHigh,
+          ),
+        };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
+        color: wash,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.45)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -34,9 +62,9 @@ class VehicleStatusChip extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
+              color: textColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
             ),
           ),
         ],

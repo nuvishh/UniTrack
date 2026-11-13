@@ -29,11 +29,11 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-/// Small pill identifying a provider, tinted with its bold brand colour.
-/// Small coloured pill naming the provider, with a dot. Resolves the
-/// display name through the provider descriptors, so registry-added
-/// providers show their name too (and an unknown key falls back to
-/// the key itself instead of throwing).
+/// Small pill identifying a provider, in secondaryContainer (Material
+/// You, v1.3.0 — the same pill the prototype uses in the detail header
+/// and map sheet). Resolves the display name through the provider
+/// descriptors, so registry-added providers show their name too (and
+/// an unknown key falls back to the key itself instead of throwing).
 class ProviderBadge extends ConsumerWidget {
   const ProviderBadge({super.key, required this.providerKey});
 
@@ -41,34 +41,23 @@ class ProviderBadge extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final descriptors = ref.watch(providerDescriptorsProvider);
     final match = descriptors.where((d) => d.key == providerKey);
     final displayName = match.isEmpty ? providerKey : match.first.displayName;
-    final color = AppColors.providerColor(providerKey);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.13),
+        color: theme.colorScheme.secondaryContainer,
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            displayName,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w800,
-              fontSize: 12,
-            ),
-          ),
-        ],
+      child: Text(
+        displayName,
+        style: TextStyle(
+          color: theme.colorScheme.onSecondaryContainer,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -201,7 +190,7 @@ class ErrorStateCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
-      color: AppColors.expired.withValues(alpha: 0.1),
+      color: AppColors.error.withValues(alpha: 0.1),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -209,7 +198,7 @@ class ErrorStateCard extends StatelessWidget {
           children: [
             const Icon(
               Icons.cloud_off_outlined,
-              color: AppColors.expired,
+              color: AppColors.error,
               size: 28,
             ),
             const SizedBox(width: 12),
@@ -220,7 +209,7 @@ class ErrorStateCard extends StatelessWidget {
                   Text(
                     'Couldn\'t refresh the fleet',
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: AppColors.expired,
+                      color: AppColors.error,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -319,12 +308,12 @@ class StepIndicator extends StatelessWidget {
           if (i > 0)
             Expanded(
               child: Container(
-                height: 3,
+                height: 4,
                 margin: const EdgeInsets.symmetric(horizontal: 4),
                 decoration: BoxDecoration(
                   color: i <= currentStep
                       ? primary
-                      : muted.withValues(alpha: 0.3),
+                      : theme.colorScheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),

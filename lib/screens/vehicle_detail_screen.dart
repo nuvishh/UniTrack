@@ -168,6 +168,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
     String label,
     String value, {
     Widget? trailing,
+    bool monoValue = false,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
@@ -189,7 +190,16 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
             ),
           ),
           Expanded(
-            child: Text(value, style: Theme.of(context).textTheme.bodyMedium),
+            child: Text(
+              value,
+              style: monoValue
+                  ? AppTheme.mono(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    )
+                  : Theme.of(context).textTheme.bodyMedium,
+            ),
           ),
           ?trailing,
         ],
@@ -213,78 +223,59 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
     final supportsHistory = descriptor.isEmpty
         ? false
         : descriptor.first.supportsHistory;
-    final statusColor = AppColors.statusColor(vehicle.status);
-    final statusLabel = switch (vehicle.status) {
-      VehicleStatus.live => 'LIVE',
-      VehicleStatus.idle => 'IDLE',
-      VehicleStatus.unknown => 'UNKNOWN',
-      VehicleStatus.expired => 'EXPIRED',
-    };
     final history = _history;
     final historyPoints = history?.where((v) => v.hasFix).toList() ?? const [];
     return Scaffold(
-      appBar: AppBar(title: Text(vehicle.displayName)),
+      appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.all(8),
+          child: IconButton(
+            style: IconButton.styleFrom(
+              backgroundColor: theme.colorScheme.surfaceContainer,
+              foregroundColor: theme.colorScheme.onSurface,
+            ),
+            icon: const Icon(Icons.arrow_back),
+            tooltip: 'Back to fleet',
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+        title: Text(
+          vehicle.displayName,
+          style: AppTheme.mono(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          // Status hero.
+          // Status hero: a tonal primaryContainer card (Material You,
+          // v1.3.0 — the old status-colour gradient is gone), with
+          // the status chip, big speed and ignition, as in the
+          // prototype's detail hero.
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [statusColor, statusColor.withValues(alpha: 0.75)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: statusColor.withValues(alpha: 0.35),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+              color: theme.colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(28),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    PulsingDot(
-                      color: Colors.white,
-                      pulsing: vehicle.status == VehicleStatus.live,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      statusLabel,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
+                    VehicleStatusChip(status: vehicle.status),
                     const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.22),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        vehicle.ignition == null
-                            ? 'Ignition unknown'
-                            : vehicle.ignition!
-                            ? 'Ignition on'
-                            : 'Ignition off',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
+                    Text(
+                      lastUpdatedLabel(vehicle),
+                      style: TextStyle(
+                        color: theme.colorScheme.onPrimaryContainer.withValues(
+                          alpha: 0.8,
                         ),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -297,8 +288,8 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                       vehicle.speedKmph == null
                           ? '—'
                           : vehicle.speedKmph!.toStringAsFixed(0),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: theme.colorScheme.onPrimaryContainer,
                         fontSize: 64,
                         fontWeight: FontWeight.w800,
                         height: 1,
@@ -306,27 +297,45 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
                         'km/h',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: theme.colorScheme.onPrimaryContainer,
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
+                    const Spacer(),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'Ignition',
+                          style: TextStyle(
+                            color: theme.colorScheme.onPrimaryContainer
+                                .withValues(alpha: 0.75),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          vehicle.ignition == null
+                              ? 'Unknown'
+                              : vehicle.ignition!
+                              ? 'ON • Running'
+                              : 'OFF • Parked',
+                          style: TextStyle(
+                            color: theme.colorScheme.onPrimaryContainer,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  lastUpdatedLabel(vehicle),
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
                 ),
               ],
             ),
@@ -375,9 +384,19 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                     'Provider',
                     providerName,
                   ),
-                  _infoRow(Icons.tag_outlined, 'Reg no', vehicle.displayName),
+                  _infoRow(
+                    Icons.tag_outlined,
+                    'Reg no',
+                    vehicle.displayName,
+                    monoValue: true,
+                  ),
                   if (vehicle.imei != null)
-                    _infoRow(Icons.memory_outlined, 'IMEI', vehicle.imei!),
+                    _infoRow(
+                      Icons.memory_outlined,
+                      'IMEI',
+                      vehicle.imei!,
+                      monoValue: true,
+                    ),
                   _infoRow(
                     Icons.location_on_outlined,
                     'Location',
@@ -418,15 +437,15 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
           const SizedBox(height: 20),
           if (!supportsHistory)
             Card(
-              color: AppColors.idle.withValues(alpha: 0.12),
+              color: theme.colorScheme.tertiaryContainer,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.info_outline,
-                      color: AppColors.idle,
+                      color: theme.colorScheme.onTertiaryContainer,
                       size: 26,
                     ),
                     const SizedBox(width: 12),
@@ -435,7 +454,9 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                         'History is not supported by '
                         '$providerName — it returns live '
                         'snapshots only.',
-                        style: theme.textTheme.bodyMedium,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onTertiaryContainer,
+                        ),
                       ),
                     ),
                   ],

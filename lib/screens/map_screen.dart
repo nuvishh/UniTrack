@@ -57,12 +57,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             children: [
               Center(
                 child: Container(
-                  width: 40,
+                  width: 32,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.onSurfaceVariant.withValues(
-                      alpha: 0.4,
-                    ),
+                    color: theme.colorScheme.outlineVariant,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -283,9 +281,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                               vehicle.displayName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: AppTheme.mono(
                                 fontSize: 12,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
@@ -321,8 +319,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
             ],
           ),
-          // Live count chip. The label truncates instead of
-          // overflowing on narrow screens / large system fonts.
+          // Live count chip: a surfaceContainerHigh pill, as in the
+          // prototype. The label truncates instead of overflowing
+          // on narrow screens / large system fonts.
           Positioned(
             top: 12,
             left: 16,
@@ -334,7 +333,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
+                  color: theme.colorScheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(999),
                   boxShadow: [
                     BoxShadow(
@@ -366,7 +365,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
             ),
           ),
-          // Fit-all + recenter buttons.
+          // Fit-all + recenter buttons: tonal, as in the prototype —
+          // Fit all is secondaryContainer, Recenter is
+          // surfaceContainerHigh with an outline border.
           Positioned(
             right: 16,
             bottom: 24,
@@ -376,6 +377,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   heroTag: 'fit_all',
                   onPressed: () => _fitAll(withFix),
                   tooltip: 'Fit all vehicles',
+                  backgroundColor: theme.colorScheme.secondaryContainer,
+                  foregroundColor: theme.colorScheme.onSecondaryContainer,
                   child: const Icon(Icons.zoom_out_map),
                 ),
                 const SizedBox(height: 12),
@@ -383,6 +386,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   heroTag: 'recenter',
                   onPressed: () => _recenter(withFix),
                   tooltip: 'Centre on a live vehicle',
+                  backgroundColor: theme.colorScheme.surfaceContainerHigh,
+                  foregroundColor: theme.colorScheme.onSurface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: theme.colorScheme.outlineVariant,
+                    ),
+                  ),
                   child: const Icon(Icons.my_location),
                 ),
               ],

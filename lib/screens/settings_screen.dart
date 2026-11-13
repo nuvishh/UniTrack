@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/saved_vehicle.dart';
+import '../models/theme_seed.dart';
 import '../providers/registry_provider.dart';
 import '../providers/saved_vehicles_provider.dart';
 import '../providers/storage_provider.dart';
@@ -235,6 +236,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final themeMode = ref.watch(themeProvider);
+    final themeSeed = ref.watch(themeSeedProvider);
     final refreshInterval = ref.watch(
       trackerProvider.select((s) => s.refreshInterval),
     );
@@ -248,7 +250,18 @@ class SettingsScreen extends ConsumerWidget {
     final registryState = ref.watch(registryProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Settings'),
+            Text(
+              'Material You theme, polling intervals & providers',
+              style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
+            ),
+          ],
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
@@ -275,6 +288,73 @@ class SettingsScreen extends ConsumerWidget {
             onSelectionChanged: (selected) {
               ref.read(themeProvider.notifier).setMode(selected.first);
             },
+          ),
+          const SizedBox(height: 24),
+          const SectionHeader(title: 'Colour theme'),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: ThemeSeed.values.map((seed) {
+              final selected = seed.id == themeSeed.id;
+              final scheme = theme.colorScheme;
+              return InkWell(
+                onTap: () =>
+                    ref.read(themeSeedProvider.notifier).setSeed(seed),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? scheme.secondaryContainer
+                        : scheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(20),
+                    border: selected
+                        ? Border.all(color: scheme.primary, width: 2)
+                        : Border.all(color: scheme.outlineVariant),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: seed.swatch,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: scheme.outlineVariant,
+                          ),
+                        ),
+                        child: selected
+                            ? Icon(
+                                Icons.check,
+                                size: 14,
+                                color: seed.light.onPrimary,
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        seed.name,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: selected
+                              ? scheme.onSecondaryContainer
+                              : scheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Applies immediately, in both light and dark mode.',
+            style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 24),
           const SectionHeader(title: 'Refresh interval'),
@@ -350,13 +430,13 @@ class SettingsScreen extends ConsumerWidget {
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                color: theme.colorScheme.secondaryContainer,
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 '$savedCount',
                 style: TextStyle(
-                  color: theme.colorScheme.primary,
+                  color: theme.colorScheme.onSecondaryContainer,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -491,13 +571,13 @@ class SettingsScreen extends ConsumerWidget {
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.16),
+                            color: theme.colorScheme.secondaryContainer,
                             borderRadius: BorderRadius.circular(999),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Remote',
                             style: TextStyle(
-                              color: AppColors.primary,
+                              color: theme.colorScheme.onSecondaryContainer,
                               fontWeight: FontWeight.w800,
                               fontSize: 11,
                             ),
@@ -525,16 +605,12 @@ class SettingsScreen extends ConsumerWidget {
                         width: 52,
                         height: 52,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppColors.primary, AppColors.secondary],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          color: theme.colorScheme.primaryContainer,
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.location_on,
-                          color: Colors.white,
+                          color: theme.colorScheme.onPrimaryContainer,
                           size: 28,
                         ),
                       ),
@@ -545,7 +621,7 @@ class SettingsScreen extends ConsumerWidget {
                           children: [
                             Text('UniTrack', style: theme.textTheme.titleLarge),
                             Text(
-                              'Version 1.2.1 (build 12)',
+                              'Version 1.3.0 (build 13)',
                               style: theme.textTheme.bodySmall,
                             ),
                           ],

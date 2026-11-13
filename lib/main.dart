@@ -23,10 +23,11 @@ class UniTrackApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeProvider);
+    final seed = ref.watch(themeSeedProvider);
     return MaterialApp(
       title: 'UniTrack',
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
+      theme: AppTheme.lightFor(seed),
+      darkTheme: AppTheme.darkFor(seed),
       themeMode: themeMode,
       home: const HomeScreen(),
     );
