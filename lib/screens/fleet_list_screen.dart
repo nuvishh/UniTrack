@@ -168,17 +168,13 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.location_on,
-                color: theme.colorScheme.onPrimaryContainer,
-                size: 22,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                'assets/icon/app_icon_transparent.png',
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
               ),
             ),
             const SizedBox(width: 10),
