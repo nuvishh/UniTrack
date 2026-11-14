@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/trip_point.dart';
 import '../models/vehicle.dart';
 import '../providers/registry_provider.dart';
@@ -46,13 +47,14 @@ class _LiveLocationMap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final point = LatLng(vehicle.latitude!, vehicle.longitude!);
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const MapScreen()),
-        ),
+        onTap: () =>
+            Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const MapScreen())),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -60,10 +62,7 @@ class _LiveLocationMap extends StatelessWidget {
               height: 200,
               child: IgnorePointer(
                 child: FlutterMap(
-                  options: MapOptions(
-                    initialCenter: point,
-                    initialZoom: 14,
-                  ),
+                  options: MapOptions(initialCenter: point, initialZoom: 14),
                   children: [
                     TileLayer(
                       urlTemplate:
@@ -96,7 +95,7 @@ class _LiveLocationMap extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Live location — tap for the full map',
+                      l10n.liveLocationHint,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -143,7 +142,10 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
     } catch (e) {
       // Timeout / network errors used to be unhandled here.
       if (!mounted) return;
-      setState(() => _historyError = 'Could not load history: $e');
+      setState(
+        () =>
+            _historyError = AppLocalizations.of(context).historyLoadError('$e'),
+      );
     } finally {
       if (mounted) setState(() => _loadingHistory = false);
     }
@@ -159,8 +161,9 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
             '${vehicle.longitude!.toStringAsFixed(6)}',
       ),
     );
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Coordinates copied.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context).coordinatesCopied)),
+    );
   }
 
   Widget _infoRow(
@@ -210,13 +213,12 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final vehicle = widget.vehicle;
     // Descriptor-aware provider info (works for registry-added
     // providers too — GpsProvider.fromKey would throw for them).
     final descriptors = ref.watch(providerDescriptorsProvider);
-    final descriptor = descriptors.where(
-      (d) => d.key == vehicle.providerKey,
-    );
+    final descriptor = descriptors.where((d) => d.key == vehicle.providerKey);
     final providerName = descriptor.isEmpty
         ? vehicle.providerKey
         : descriptor.first.displayName;
@@ -235,7 +237,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
               foregroundColor: theme.colorScheme.onSurface,
             ),
             icon: const Icon(Icons.arrow_back),
-            tooltip: 'Back to fleet',
+            tooltip: l10n.backToFleet,
             onPressed: () => Navigator.of(context).pop(),
           ),
         ),
@@ -269,7 +271,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                     VehicleStatusChip(status: vehicle.status),
                     const Spacer(),
                     Text(
-                      lastUpdatedLabel(vehicle),
+                      l10n.lastUpdatedLabel(vehicle),
                       style: TextStyle(
                         color: theme.colorScheme.onPrimaryContainer.withValues(
                           alpha: 0.8,
@@ -313,7 +315,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          'Ignition',
+                          l10n.ignition,
                           style: TextStyle(
                             color: theme.colorScheme.onPrimaryContainer
                                 .withValues(alpha: 0.75),
@@ -323,10 +325,10 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                         ),
                         Text(
                           vehicle.ignition == null
-                              ? 'Unknown'
+                              ? l10n.unknown
                               : vehicle.ignition!
-                              ? 'ON • Running'
-                              : 'OFF • Parked',
+                              ? l10n.ignitionOnRunning
+                              : l10n.ignitionOffParked,
                           style: TextStyle(
                             color: theme.colorScheme.onPrimaryContainer,
                             fontSize: 14,
@@ -357,7 +359,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Vehicle',
+                          l10n.vehicleSection,
                           style: theme.textTheme.titleLarge,
                         ),
                       ),
@@ -376,17 +378,17 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                   const SizedBox(height: 8),
                   _infoRow(
                     vehicle.category.icon,
-                    'Type',
-                    vehicle.category.label,
+                    l10n.typeLabel,
+                    l10n.categoryLabel(vehicle.category),
                   ),
                   _infoRow(
                     Icons.business_outlined,
-                    'Provider',
+                    l10n.providerLabel,
                     providerName,
                   ),
                   _infoRow(
                     Icons.tag_outlined,
-                    'Reg no',
+                    l10n.regNoLabel2,
                     vehicle.displayName,
                     monoValue: true,
                   ),
@@ -399,29 +401,29 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                     ),
                   _infoRow(
                     Icons.location_on_outlined,
-                    'Location',
+                    l10n.locationLabel,
                     vehicle.hasFix
                         ? '${vehicle.latitude!.toStringAsFixed(6)}, '
                               '${vehicle.longitude!.toStringAsFixed(6)}'
-                        : 'No fix yet',
+                        : l10n.noFixYet,
                     trailing: vehicle.hasFix
                         ? IconButton(
                             icon: const Icon(Icons.copy_outlined, size: 20),
-                            tooltip: 'Copy coordinates',
+                            tooltip: l10n.copyCoordinates,
                             onPressed: _copyCoordinates,
                           )
                         : null,
                   ),
                   _infoRow(
                     Icons.access_time_outlined,
-                    'Last update',
-                    lastUpdatedLabel(vehicle),
+                    l10n.lastUpdated,
+                    l10n.lastUpdatedLabel(vehicle),
                   ),
                   if (vehicle.lastUpdatedRaw.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(left: 32, top: 2),
                       child: Text(
-                        'Provider time: ${vehicle.lastUpdatedRaw}',
+                        l10n.providerTime(vehicle.lastUpdatedRaw),
                         style: theme.textTheme.bodySmall,
                       ),
                     ),
@@ -432,7 +434,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
           const SizedBox(height: 20),
           // Today's trip, from the local trip log (recorded on every
           // poll — works for live-snapshot-only providers too).
-          const SectionHeader(title: "Today's trip"),
+          SectionHeader(title: l10n.todaysTrip),
           _TodaysTripSection(vehicle: vehicle),
           const SizedBox(height: 20),
           if (!supportsHistory)
@@ -451,9 +453,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'History is not supported by '
-                        '$providerName — it returns live '
-                        'snapshots only.',
+                        l10n.historyNotSupported(providerName),
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onTertiaryContainer,
                         ),
@@ -464,11 +464,13 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
               ),
             )
           else ...[
-            const SectionHeader(title: "Today's route"),
+            SectionHeader(title: l10n.todaysRoute),
             FilledButton.icon(
               onPressed: _loadingHistory ? null : _loadHistory,
               icon: const Icon(Icons.route_outlined),
-              label: Text(_loadingHistory ? 'Loading…' : "Load today's route"),
+              label: Text(
+                _loadingHistory ? l10n.loading : l10n.loadTodaysRoute,
+              ),
             ),
             if (_historyError != null) ...[
               const SizedBox(height: 12),
@@ -477,7 +479,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
             if (history != null) ...[
               const SizedBox(height: 12),
               Text(
-                '${history.length} point(s) today',
+                l10n.pointsToday(history.length),
                 style: theme.textTheme.titleMedium,
               ),
               if (historyPoints.length >= 2) ...[
@@ -525,9 +527,9 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                       child: ListTile(
                         dense: true,
                         leading: const Icon(Icons.location_on_outlined),
-                        title: Text(lastUpdatedLabel(point)),
+                        title: Text(l10n.lastUpdatedLabel(point)),
                         subtitle: Text(
-                          '${speedLabel(point)} · '
+                          '${l10n.speedLabel(point)} · '
                           '${point.latitude?.toStringAsFixed(5) ?? '—'}, '
                           '${point.longitude?.toStringAsFixed(5) ?? '—'}',
                         ),
@@ -554,12 +556,7 @@ class _TodaysTripSection extends ConsumerWidget {
 
   final Vehicle vehicle;
 
-  Widget _stat(
-    BuildContext context,
-    String label,
-    String value,
-    Color color,
-  ) {
+  Widget _stat(BuildContext context, String label, String value, Color color) {
     final theme = Theme.of(context);
     return Expanded(
       child: Column(
@@ -580,6 +577,7 @@ class _TodaysTripSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     // Watch the log so the section updates as new points arrive.
     ref.watch(tripLogProvider);
     final key = vehicleKey(vehicle.providerKey, vehicle.id);
@@ -597,11 +595,7 @@ class _TodaysTripSection extends ConsumerWidget {
               const Icon(Icons.route_outlined),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  'No trip data today yet — positions are recorded '
-                  'while the app polls. Check back after a drive.',
-                  style: theme.textTheme.bodyMedium,
-                ),
+                child: Text(l10n.noTripData, style: theme.textTheme.bodyMedium),
               ),
             ],
           ),
@@ -617,25 +611,25 @@ class _TodaysTripSection extends ConsumerWidget {
               children: [
                 _stat(
                   context,
-                  'Distance',
+                  l10n.distance,
                   formatDistanceKm(summary.distanceKm),
                   AppColors.live,
                 ),
                 _stat(
                   context,
-                  'Driving',
+                  l10n.drivingTime,
                   formatDuration(summary.driving),
                   theme.colorScheme.primary,
                 ),
                 _stat(
                   context,
-                  'Idling',
+                  l10n.idling,
                   formatDuration(summary.idling),
                   AppColors.idle,
                 ),
                 _stat(
                   context,
-                  'Stopped',
+                  l10n.stopped,
                   formatDuration(summary.stopped),
                   AppColors.expired,
                 ),
@@ -643,7 +637,7 @@ class _TodaysTripSection extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '${summary.points} point(s) today · Local trip log',
+              l10n.pointsTodayLog(summary.points),
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
@@ -652,7 +646,7 @@ class _TodaysTripSection extends ConsumerWidget {
               child: OutlinedButton.icon(
                 onPressed: () => _exportCsv(context, points, summary),
                 icon: const Icon(Icons.share_outlined),
-                label: const Text('Export today as CSV'),
+                label: Text(l10n.exportCsv),
               ),
             ),
           ],
@@ -676,14 +670,10 @@ class _TodaysTripSection extends ConsumerWidget {
         'unitrack-${vehicle.displayName}-${day.year}-'
         '${day.month.toString().padLeft(2, '0')}-'
         '${day.day.toString().padLeft(2, '0')}.csv';
-    await SharePlus.instance.share(
-      ShareParams(text: csv, subject: filename),
-    );
+    await SharePlus.instance.share(ShareParams(text: csv, subject: filename));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Report shared — save it from the share sheet.'),
-      ),
+      SnackBar(content: Text(AppLocalizations.of(context).reportShared)),
     );
   }
 }

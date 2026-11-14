@@ -49,9 +49,9 @@ class SeedPalette {
 /// A Material You colour seed: id, display name, swatch colour and the
 /// full light + dark palettes.
 ///
-/// The prototype ships four: ocean (default), sage, indigo, terracotta.
-/// A new seed is data only — add its palettes here and it appears in
-/// the Settings picker with no other code changes.
+/// The prototype ships five: royal (default since v1.4.0), ocean, sage,
+/// indigo, terracotta. A new seed is data only — add its palettes here
+/// and it appears in the Settings picker with no other code changes.
 class ThemeSeed {
   const ThemeSeed({
     required this.id,
@@ -70,9 +70,64 @@ class ThemeSeed {
   final SeedPalette light;
   final SeedPalette dark;
 
-  static const List<ThemeSeed> values = [ocean, sage, indigo, terracotta];
+  static const List<ThemeSeed> values = [
+    royal,
+    ocean,
+    sage,
+    indigo,
+    terracotta,
+  ];
 
-  /// The default seed.
+  /// The default seed since v1.4.0 (RingWise look): lavender surfaces,
+  /// purple primary, Poppins.
+  static const ThemeSeed royal = ThemeSeed(
+    id: 'royal',
+    name: 'Royal Violet',
+    swatch: Color(0xFF6C4CF1),
+    light: SeedPalette(
+      primary: Color(0xFF6C4CF1),
+      onPrimary: Color(0xFFFFFFFF),
+      primaryContainer: Color(0xFFE4DEFF),
+      onPrimaryContainer: Color(0xFF1E1B4B),
+      secondaryContainer: Color(0xFFEDE9FE),
+      onSecondaryContainer: Color(0xFF2E1065),
+      tertiaryContainer: Color(0xFFD1FAE5),
+      onTertiaryContainer: Color(0xFF022C22),
+      surface: Color(0xFFF5F3FF),
+      surfaceLowest: Color(0xFFFFFFFF),
+      surfaceLow: Color(0xFFEFEAFF),
+      surfaceContainer: Color(0xFFE9E4FF),
+      surfaceHigh: Color(0xFFE0D9FB),
+      surfaceHighest: Color(0xFFD6CCF5),
+      onSurface: Color(0xFF17142B),
+      onSurfaceVariant: Color(0xFF5B5570),
+      outline: Color(0xFF7A7390),
+      outlineVariant: Color(0xFFD8D2EC),
+    ),
+    dark: SeedPalette(
+      primary: Color(0xFFB7A6FF),
+      onPrimary: Color(0xFF2E1065),
+      primaryContainer: Color(0xFF4C1D95),
+      onPrimaryContainer: Color(0xFFEDE9FE),
+      secondaryContainer: Color(0xFF3B3355),
+      onSecondaryContainer: Color(0xFFEDE9FE),
+      tertiaryContainer: Color(0xFF14532D),
+      onTertiaryContainer: Color(0xFFD1FAE5),
+      surface: Color(0xFF14101F),
+      surfaceLowest: Color(0xFF0D0A16),
+      surfaceLow: Color(0xFF1B1729),
+      surfaceContainer: Color(0xFF231E33),
+      surfaceHigh: Color(0xFF2D2740),
+      surfaceHighest: Color(0xFF383050),
+      onSurface: Color(0xFFEAE6F9),
+      onSurfaceVariant: Color(0xFFA49DC0),
+      outline: Color(0xFF7C7494),
+      outlineVariant: Color(0xFF37304D),
+    ),
+  );
+
+  /// Ocean Slate — the default seed from v1.3.0 until v1.3.1: deep teal,
+  /// slate surfaces.
   static const ThemeSeed ocean = ThemeSeed(
     id: 'ocean',
     name: 'Ocean Slate',
@@ -258,11 +313,11 @@ class ThemeSeed {
   );
 
   /// Looks a seed up by id; unknown ids (e.g. from an old install)
-  /// fall back to the default ocean seed instead of throwing.
+  /// fall back to the default royal seed instead of throwing.
   static ThemeSeed fromId(String? id) {
     for (final seed in values) {
       if (seed.id == id) return seed;
     }
-    return ocean;
+    return royal;
   }
 }

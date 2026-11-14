@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/vehicle.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/tracker_provider.dart';
@@ -46,6 +47,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   void _showVehicleSheet(Vehicle vehicle) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet<void>(
       context: context,
       builder: (context) {
@@ -89,7 +91,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    vehicle.category.label,
+                    l10n.categoryLabel(vehicle.category),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -122,10 +124,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   const Spacer(),
                   Text(
                     vehicle.ignition == null
-                        ? 'Ignition unknown'
+                        ? l10n.ignitionUnknown
                         : vehicle.ignition!
-                        ? 'Ignition on'
-                        : 'Ignition off',
+                        ? l10n.ignitionOnText
+                        : l10n.ignitionOffText,
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       color: vehicle.ignition == null
@@ -138,7 +140,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ],
               ),
               const SizedBox(height: 6),
-              Text(lastUpdatedLabel(vehicle), style: theme.textTheme.bodySmall),
+              Text(
+                l10n.lastUpdatedLabel(vehicle),
+                style: theme.textTheme.bodySmall,
+              ),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -146,13 +151,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     child: FilledButton.icon(
                       onPressed: () => _openDetail(vehicle),
                       icon: const Icon(Icons.info_outline),
-                      label: const Text('View details'),
+                      label: Text(l10n.viewDetails),
                     ),
                   ),
                   const SizedBox(width: 12),
                   OutlinedButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Close'),
+                    child: Text(l10n.close),
                   ),
                 ],
               ),
@@ -166,7 +171,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _fitAll(List<Vehicle> withFix) {
     if (withFix.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No vehicles with a location yet.')),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).noVehiclesWithLocation),
+        ),
       );
       return;
     }
@@ -203,6 +210,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final vehicles = ref.watch(trackerProvider.select((s) => s.vehicles));
     // Cross-tab focus: a fleet card's "Map" action asks for a
     // vehicle; centre on it once, then clear the request. If the
@@ -210,9 +218,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // until the next fleet update.
     ref.listen(homeNavProvider.select((s) => s.mapVehicleKey), (_, key) {
       if (key == null) return;
-      final match = vehicles.where(
-        (v) => '${v.providerKey}:${v.id}' == key,
-      );
+      final match = vehicles.where((v) => '${v.providerKey}:${v.id}' == key);
       if (match.isEmpty || !match.first.hasFix) return;
       _mapController.move(
         LatLng(match.first.latitude!, match.first.longitude!),
@@ -232,7 +238,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         .length;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Map')),
+      appBar: AppBar(title: Text(l10n.navMap)),
       body: Stack(
         children: [
           FlutterMap(
@@ -293,10 +299,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                             decoration: BoxDecoration(
                               color: AppColors.statusColor(vehicle.status),
                               shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 2,
-                              ),
+                              border: Border.all(color: Colors.white, width: 2),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withValues(alpha: 0.25),
@@ -350,8 +353,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        '$liveCount live · $idleCount idle · '
-                        '${vehicles.length} total',
+                        l10n.mapCountLabel(
+                          liveCount,
+                          idleCount,
+                          vehicles.length,
+                        ),
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
                         style: const TextStyle(
@@ -376,7 +382,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 FloatingActionButton.small(
                   heroTag: 'fit_all',
                   onPressed: () => _fitAll(withFix),
-                  tooltip: 'Fit all vehicles',
+                  tooltip: l10n.fitAllVehicles,
                   backgroundColor: theme.colorScheme.secondaryContainer,
                   foregroundColor: theme.colorScheme.onSecondaryContainer,
                   child: const Icon(Icons.zoom_out_map),
@@ -385,14 +391,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 FloatingActionButton.small(
                   heroTag: 'recenter',
                   onPressed: () => _recenter(withFix),
-                  tooltip: 'Centre on a live vehicle',
+                  tooltip: l10n.centreOnLive,
                   backgroundColor: theme.colorScheme.surfaceContainerHigh,
                   foregroundColor: theme.colorScheme.onSurface,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(
-                      color: theme.colorScheme.outlineVariant,
-                    ),
+                    side: BorderSide(color: theme.colorScheme.outlineVariant),
                   ),
                   child: const Icon(Icons.my_location),
                 ),
@@ -417,11 +421,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ),
                 child: EmptyState(
                   icon: Icons.map_outlined,
-                  title: 'No vehicles on the map yet',
-                  message:
-                      'Add a vehicle and its live location will '
-                      'appear here.',
-                  actionLabel: 'Add your first vehicle',
+                  title: l10n.mapEmptyTitle2,
+                  message: l10n.mapEmptyMessage2,
+                  actionLabel: l10n.emptyFleetAction,
                   onAction: _openAddVehicle,
                 ),
               ),
@@ -444,16 +446,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     ),
                   ],
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.location_off_outlined),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'No locations to show yet — the providers '
-                        'have not returned a fix for these vehicles.',
-                      ),
-                    ),
+                    const Icon(Icons.location_off_outlined),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(l10n.noLocationsYet)),
                   ],
                 ),
               ),

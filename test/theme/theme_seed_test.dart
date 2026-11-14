@@ -8,21 +8,22 @@ import 'package:unitrack/theme/app_theme.dart';
 
 void main() {
   group('ThemeSeed model', () {
-    test('has exactly four seeds with unique ids', () {
-      expect(ThemeSeed.values.length, 4);
+    test('has exactly five seeds with unique ids', () {
+      expect(ThemeSeed.values.length, 5);
       final ids = ThemeSeed.values.map((s) => s.id).toSet();
-      expect(ids.length, 4);
+      expect(ids.length, 5);
       expect(
         ids,
-        containsAll(['ocean', 'sage', 'indigo', 'terracotta']),
+        containsAll(['royal', 'ocean', 'sage', 'indigo', 'terracotta']),
       );
     });
 
-    test('ocean is the default seed', () {
-      expect(ThemeSeed.ocean.id, 'ocean');
-      expect(ThemeSeed.ocean.name, 'Ocean Slate');
-      expect(ThemeSeed.fromId(null), ThemeSeed.ocean);
-      expect(ThemeSeed.fromId('nope'), ThemeSeed.ocean);
+    test('royal is the default seed', () {
+      expect(ThemeSeed.royal.id, 'royal');
+      expect(ThemeSeed.royal.name, 'Royal Violet');
+      expect(ThemeSeed.fromId(null), ThemeSeed.royal);
+      expect(ThemeSeed.fromId('nope'), ThemeSeed.royal);
+      expect(ThemeSeed.fromId('ocean'), ThemeSeed.ocean);
       expect(ThemeSeed.fromId('sage'), ThemeSeed.sage);
       expect(ThemeSeed.fromId('indigo'), ThemeSeed.indigo);
       expect(ThemeSeed.fromId('terracotta'), ThemeSeed.terracotta);
@@ -31,12 +32,12 @@ void main() {
     test('each seed has its own light and dark primary', () {
       // No two seeds share a primary in either brightness — a seed
       // must not silently reuse another seed's surfaces.
-      final lightPrimaries =
-          ThemeSeed.values.map((s) => s.light.primary).toSet();
-      final darkPrimaries =
-          ThemeSeed.values.map((s) => s.dark.primary).toSet();
-      expect(lightPrimaries.length, 4);
-      expect(darkPrimaries.length, 4);
+      final lightPrimaries = ThemeSeed.values
+          .map((s) => s.light.primary)
+          .toSet();
+      final darkPrimaries = ThemeSeed.values.map((s) => s.dark.primary).toSet();
+      expect(lightPrimaries.length, 5);
+      expect(darkPrimaries.length, 5);
     });
   });
 
@@ -77,9 +78,18 @@ void main() {
       }
     });
 
-    test('the ocean defaults match the prototype values', () {
+    test('the royal defaults match the prototype values', () {
       final light = AppTheme.light;
       final dark = AppTheme.dark;
+      expect(light.colorScheme.primary, const Color(0xFF6C4CF1));
+      expect(light.colorScheme.surface, const Color(0xFFF5F3FF));
+      expect(dark.colorScheme.primary, const Color(0xFFB7A6FF));
+      expect(dark.colorScheme.surface, const Color(0xFF14101F));
+    });
+
+    test('the ocean seed keeps its v1.3.0 values', () {
+      final light = AppTheme.lightFor(ThemeSeed.ocean);
+      final dark = AppTheme.darkFor(ThemeSeed.ocean);
       expect(light.colorScheme.primary, const Color(0xFF0F4C5C));
       expect(light.colorScheme.surface, const Color(0xFFF8FAFC));
       expect(dark.colorScheme.primary, const Color(0xFF7AD5F5));
@@ -97,7 +107,8 @@ void main() {
           expect(
             (bg.computeLuminance() - fg.computeLuminance()).abs(),
             greaterThan(0.5),
-            reason: 'snackbar text unreadable for ${seed.id} '
+            reason:
+                'snackbar text unreadable for ${seed.id} '
                 '${theme.brightness}',
           );
         }
@@ -106,12 +117,12 @@ void main() {
   });
 
   group('ThemeSeedNotifier persistence', () {
-    test('defaults to ocean', () {
+    test('defaults to royal', () {
       SharedPreferences.setMockInitialValues({});
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      expect(container.read(themeSeedProvider), ThemeSeed.ocean);
+      expect(container.read(themeSeedProvider), ThemeSeed.royal);
     });
 
     test('setSeed updates state and persists the choice', () async {
@@ -134,23 +145,23 @@ void main() {
       addTearDown(container.dispose);
 
       // Reading the provider starts the background load.
-      expect(container.read(themeSeedProvider), ThemeSeed.ocean);
+      expect(container.read(themeSeedProvider), ThemeSeed.royal);
       await Future<void>.delayed(const Duration(milliseconds: 100));
 
       expect(container.read(themeSeedProvider), ThemeSeed.terracotta);
     });
 
-    test('an unknown saved seed id falls back to ocean', () async {
+    test('an unknown saved seed id falls back to royal', () async {
       SharedPreferences.setMockInitialValues({
         ThemeSeedNotifier.prefsKey: 'neon',
       });
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      expect(container.read(themeSeedProvider), ThemeSeed.ocean);
+      expect(container.read(themeSeedProvider), ThemeSeed.royal);
       await Future<void>.delayed(const Duration(milliseconds: 100));
 
-      expect(container.read(themeSeedProvider), ThemeSeed.ocean);
+      expect(container.read(themeSeedProvider), ThemeSeed.royal);
     });
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_localizations.dart';
 import '../providers/navigation_provider.dart';
 import 'add_vehicle_screen.dart';
 import 'fleet_list_screen.dart';
@@ -33,6 +34,7 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tab = ref.watch(homeNavProvider.select((s) => s.tab));
     final tabs = _tabs(ref);
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       body: IndexedStack(index: tab, children: tabs),
       bottomNavigationBar: NavigationBar(
@@ -40,26 +42,26 @@ class HomeScreen extends ConsumerWidget {
         selectedIndex: tab,
         onDestinationSelected: (index) =>
             ref.read(homeNavProvider.notifier).goToTab(index),
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.directions_bus_outlined),
-            selectedIcon: Icon(Icons.directions_bus),
-            label: 'Fleet',
+            icon: const Icon(Icons.directions_bus_outlined),
+            selectedIcon: const Icon(Icons.directions_bus),
+            label: l10n.navFleet,
           ),
           NavigationDestination(
-            icon: Icon(Icons.map_outlined),
-            selectedIcon: Icon(Icons.map),
-            label: 'Map',
+            icon: const Icon(Icons.map_outlined),
+            selectedIcon: const Icon(Icons.map),
+            label: l10n.navMap,
           ),
           NavigationDestination(
-            icon: Icon(Icons.add_circle_outline),
-            selectedIcon: Icon(Icons.add_circle),
-            label: 'Add',
+            icon: const Icon(Icons.add_circle_outline),
+            selectedIcon: const Icon(Icons.add_circle),
+            label: l10n.navAdd,
           ),
           NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
+            icon: const Icon(Icons.settings_outlined),
+            selectedIcon: const Icon(Icons.settings),
+            label: l10n.navSettings,
           ),
         ],
       ),

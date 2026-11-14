@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/vehicle.dart';
+import '../services/alert_rules.dart';
 import '../services/tracker_service.dart';
+import 'locale_provider.dart';
+import 'notification_provider.dart';
 import 'registry_provider.dart';
 import 'storage_provider.dart';
 
@@ -86,6 +90,8 @@ class TrackerNotifier extends Notifier<TrackerState> {
 
   void _syncFromService() {
     if (_disposed) return;
+    final previous = state.vehicles;
+    final next = _service.vehicles.value;
     // The service is the source of truth; mirror all of it at once.
     state = TrackerState(
       vehicles: _service.vehicles.value,
@@ -93,6 +99,25 @@ class TrackerNotifier extends Notifier<TrackerState> {
       lastError: _service.lastError.value,
       refreshInterval: _service.refreshInterval,
     );
+    // Vehicle alerts (v1.4.0): compare the new snapshot with the
+    // one it replaces and notify on transitions (ignition on/off,
+    // offline, overspeed). Fire-and-forget — a notification failure
+    // never blocks the fleet update.
+    final alerts = alertTransitions(
+      previous: previous,
+      current: next,
+      settings: ref.read(alertSettingsProvider),
+    );
+    if (alerts.isNotEmpty) {
+      final locale =
+          ref.read(localeProvider).locale ??
+          ui.PlatformDispatcher.instance.locale;
+      unawaited(
+        ref
+            .read(notificationServiceProvider)
+            .showAlerts(alerts, locale: locale),
+      );
+    }
   }
 
   Future<void> _initialize() async {

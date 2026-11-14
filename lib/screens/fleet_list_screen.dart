@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/provider_descriptor.dart';
 import '../models/vehicle.dart';
 import '../models/vehicle_category.dart';
@@ -14,7 +15,6 @@ import '../providers/registry_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/tracker_provider.dart';
 import '../theme/app_theme.dart';
-import '../utils/time_format.dart';
 import '../widgets/app_widgets.dart';
 import '../widgets/vehicle_category_icon.dart';
 import '../widgets/vehicle_status_chip.dart';
@@ -147,14 +147,13 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final trackerState = ref.watch(trackerProvider);
     final vehicles = trackerState.vehicles;
     final isRefreshing = trackerState.isRefreshing;
     final error = trackerState.lastError;
     final descriptors = ref.watch(providerDescriptorsProvider);
-    final descriptorByKey = {
-      for (final d in descriptors) d.key: d,
-    };
+    final descriptorByKey = {for (final d in descriptors) d.key: d};
     final filtered = _filtered(vehicles, descriptorByKey);
     final liveCount = vehicles
         .where((v) => v.status == VehicleStatus.live)
@@ -187,11 +186,14 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('UniTrack'),
+                  Text(l10n.appTitle),
                   Text(
                     vehicles.isEmpty
-                        ? 'All your GPS providers, one fleet'
-                        : '${vehicles.length} vehicle${vehicles.length == 1 ? '' : 's'} · ${vehicles.map((v) => v.providerKey).toSet().length} provider${vehicles.map((v) => v.providerKey).toSet().length == 1 ? '' : 's'}',
+                        ? l10n.appSubtitle
+                        : l10n.fleetSubtitle(
+                            vehicles.length,
+                            vehicles.map((v) => v.providerKey).toSet().length,
+                          ),
                     style: theme.textTheme.bodySmall,
                   ),
                 ],
@@ -208,7 +210,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
             icon: Icon(
               isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
             ),
-            tooltip: isDark ? 'Switch to light theme' : 'Switch to dark theme',
+            tooltip: isDark ? l10n.themeToggleLight : l10n.themeToggleDark,
             onPressed: _toggleTheme,
           ),
           const SizedBox(width: 6),
@@ -218,7 +220,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
               foregroundColor: theme.colorScheme.onSecondaryContainer,
             ),
             icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh now',
+            tooltip: l10n.refreshNow,
             onPressed: _refresh,
           ),
           const SizedBox(width: 4),
@@ -246,7 +248,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search by reg no, IMEI or provider',
+                hintText: l10n.searchHint,
                 filled: true,
                 fillColor: theme.colorScheme.surfaceContainerHigh,
                 contentPadding: const EdgeInsets.symmetric(
@@ -258,7 +260,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
                     ? null
                     : IconButton(
                         icon: const Icon(Icons.clear),
-                        tooltip: 'Clear search',
+                        tooltip: l10n.clearSearch,
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
@@ -322,6 +324,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
     required bool isRefreshing,
     required String? error,
   }) {
+    final l10n = AppLocalizations.of(context);
     if (isRefreshing && vehicles.isEmpty) {
       return const FleetListSkeleton();
     }
@@ -334,12 +337,9 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
             const SizedBox(height: 24),
             EmptyState(
               icon: Icons.directions_bus_outlined,
-              title: 'No vehicles yet',
-              message:
-                  'Add a vehicle from any GPS provider — Transight, '
-                  'Aargee, LiveTrace, Mercydatrack, PauldeaTrack, '
-                  'SimplyTrack or HashTrace — and track them all here.',
-              actionLabel: 'Add your first vehicle',
+              title: l10n.emptyFleetTitle,
+              message: l10n.emptyFleetMessage,
+              actionLabel: l10n.emptyFleetAction,
               onAction: _openAddVehicle,
             ),
           ],
@@ -351,12 +351,9 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
       return _ScrollableEmptyState(
         child: EmptyState(
           icon: Icons.directions_bus_outlined,
-          title: 'No vehicles yet',
-          message:
-              'Add a vehicle from any GPS provider — Transight, Aargee, '
-              'LiveTrace, Mercydatrack, PauldeaTrack, SimplyTrack or '
-              'HashTrace — and track them all here.',
-          actionLabel: 'Add your first vehicle',
+          title: l10n.emptyFleetTitle,
+          message: l10n.emptyFleetMessage,
+          actionLabel: l10n.emptyFleetAction,
           onAction: _openAddVehicle,
         ),
       );
@@ -365,11 +362,9 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
       return _ScrollableEmptyState(
         child: EmptyState(
           icon: Icons.search_off_outlined,
-          title: 'No matches',
-          message:
-              'Nothing in the fleet matches "$_searchQuery". '
-              'Try a different reg no, provider or status.',
-          actionLabel: 'Clear search & filters',
+          title: l10n.noMatchesTitle,
+          message: l10n.noMatchesDetail(_searchQuery),
+          actionLabel: l10n.noMatchesAction,
           onAction: () {
             _searchController.clear();
             setState(() {
@@ -416,10 +411,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
       'https://www.google.com/maps/dir/?api=1'
       '&destination=${vehicle.latitude},${vehicle.longitude}',
     );
-    final opened = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!opened && mounted) {
       _openOnMap(vehicle);
     }
@@ -429,21 +421,21 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
   /// Google Maps link). Falls back to copying the text when the share
   /// sheet is unavailable.
   Future<void> _share(Vehicle vehicle) async {
+    final l10n = AppLocalizations.of(context);
     final location = vehicle.hasFix
         ? 'https://maps.google.com/?q=${vehicle.latitude},${vehicle.longitude}'
-        : 'No location yet';
+        : l10n.noLocation;
     final text =
-        '${vehicle.displayName} — ${vehicle.status.name.toUpperCase()}, '
-        '${vehicle.speedKmph == null ? 'speed unknown' : '${vehicle.speedKmph!.toStringAsFixed(0)} km/h'}. '
-        '${lastUpdatedLabel(vehicle)}. Location: $location';
+        '${vehicle.displayName} — ${l10n.statusLabel(vehicle.status).toUpperCase()}, '
+        '${vehicle.speedKmph == null ? l10n.speedUnknown : '${vehicle.speedKmph!.toStringAsFixed(0)} km/h'}. '
+        '${l10n.lastUpdatedLabel(vehicle)}. Location: $location';
     try {
       await SharePlus.instance.share(ShareParams(text: text));
     } catch (_) {
       await Clipboard.setData(ClipboardData(text: text));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Share unavailable — copied instead.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.shareUnavailableCopied)));
     }
   }
 
@@ -464,6 +456,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
   /// provider + category to All (status untouched); "Done" closes.
   Future<void> _openFilterSheet() {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final descriptors = ref.read(providerDescriptorsProvider);
     final descriptorByKey = {for (final d in descriptors) d.key: d};
     final vehicles = ref.read(trackerProvider).vehicles;
@@ -508,9 +501,9 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Filters', style: theme.textTheme.titleLarge),
+                  Text(l10n.filters, style: theme.textTheme.titleLarge),
                   const SizedBox(height: 20),
-                  Text('Provider', style: theme.textTheme.titleMedium),
+                  Text(l10n.provider, style: theme.textTheme.titleMedium),
                   const SizedBox(height: 10),
                   Column(
                     key: const Key('filterProviderSection'),
@@ -522,7 +515,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
                         children: providerKeys.map((key) {
                           final selected = key == _selectedProviderKey;
                           final label = key == 'all'
-                              ? 'All (${vehicles.length})'
+                              ? l10n.countChip(l10n.filterAll, vehicles.length)
                               : '${descriptorByKey[key]?.displayName ?? key} (${providerCounts[key]})';
                           return _FilterChip(
                             label: label,
@@ -535,7 +528,7 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  Text('Category', style: theme.textTheme.titleMedium),
+                  Text(l10n.category, style: theme.textTheme.titleMedium),
                   const SizedBox(height: 10),
                   Column(
                     key: const Key('filterCategorySection'),
@@ -546,14 +539,19 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
                         runSpacing: 8,
                         children: [
                           _FilterChip(
-                            label: 'All (${vehicles.length})',
+                            label: l10n.countChip(
+                              l10n.filterAll,
+                              vehicles.length,
+                            ),
                             selected: _selectedCategory == null,
                             onTap: () => applyCategory(null),
                           ),
                           ...categories.map(
                             (category) => _FilterChip(
-                              label:
-                                  '${category.label} (${categoryCounts[category]})',
+                              label: l10n.countChip(
+                                l10n.categoryLabel(category),
+                                categoryCounts[category]!,
+                              ),
                               selected: _selectedCategory == category,
                               icon: category.icon,
                               onTap: () => applyCategory(category),
@@ -568,12 +566,12 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
                     children: [
                       TextButton(
                         onPressed: clearAll,
-                        child: const Text('Clear all'),
+                        child: Text(l10n.clearAll),
                       ),
                       const Spacer(),
                       FilledButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Done'),
+                        child: Text(l10n.done),
                       ),
                     ],
                   ),
@@ -659,9 +657,7 @@ class _SummaryStrip extends StatelessWidget {
                 : theme.colorScheme.surfaceContainerLowest,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: selected
-                  ? theme.colorScheme.primary
-                  : Colors.transparent,
+              color: selected ? theme.colorScheme.primary : Colors.transparent,
               width: 2,
             ),
           ),
@@ -712,12 +708,13 @@ class _SummaryStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final updated = isRefreshing
-        ? 'Updating…'
+        ? l10n.updating
         : lastRefreshed == null
-        ? 'Not updated yet'
-        : 'Updated ${relativeTime(lastRefreshed)}';
+        ? l10n.notUpdatedYet
+        : l10n.tp('updatedPrefix', {'time': l10n.relativeTime(lastRefreshed)});
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.all(16),
@@ -740,7 +737,7 @@ class _SummaryStrip extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Multi-API Telemetry',
+                  l10n.multiApiTelemetry,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: isDark
@@ -782,29 +779,18 @@ class _SummaryStrip extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              _stat(
-                context,
-                live,
-                'Live',
-                AppColors.live,
-                {VehicleStatus.live},
-              ),
+              _stat(context, live, l10n.filterLive, AppColors.live, {
+                VehicleStatus.live,
+              }),
               const SizedBox(width: 8),
-              _stat(
-                context,
-                idle,
-                'Idle',
-                AppColors.idle,
-                {VehicleStatus.idle},
-              ),
+              _stat(context, idle, l10n.filterIdle, AppColors.idle, {
+                VehicleStatus.idle,
+              }),
               const SizedBox(width: 8),
-              _stat(
-                context,
-                offline,
-                'Offline',
-                AppColors.unknown,
-                {VehicleStatus.unknown, VehicleStatus.expired},
-              ),
+              _stat(context, offline, l10n.filterOffline, AppColors.unknown, {
+                VehicleStatus.unknown,
+                VehicleStatus.expired,
+              }),
             ],
           ),
         ],
@@ -924,9 +910,10 @@ class _FilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     Widget tuneButton = IconButton(
       icon: const Icon(Icons.tune),
-      tooltip: 'Filters',
+      tooltip: l10n.filters,
       onPressed: onOpenFilters,
       style: IconButton.styleFrom(
         backgroundColor: activeFilterCount > 0
@@ -960,25 +947,25 @@ class _FilterBar extends StatelessWidget {
                 child: Row(
                   children: [
                     _FilterChip(
-                      label: 'All ($total)',
+                      label: l10n.countChip(l10n.filterAll, total),
                       selected: _allSelected,
                       onTap: () => onSelectStatus(null),
                     ),
                     const SizedBox(width: 8),
                     _FilterChip(
-                      label: 'Live ($live)',
+                      label: l10n.countChip(l10n.filterLive, live),
                       selected: _isSelected({VehicleStatus.live}),
                       onTap: () => onSelectStatus({VehicleStatus.live}),
                     ),
                     const SizedBox(width: 8),
                     _FilterChip(
-                      label: 'Idle ($idle)',
+                      label: l10n.countChip(l10n.filterIdle, idle),
                       selected: _isSelected({VehicleStatus.idle}),
                       onTap: () => onSelectStatus({VehicleStatus.idle}),
                     ),
                     const SizedBox(width: 8),
                     _FilterChip(
-                      label: 'Offline ($offline)',
+                      label: l10n.countChip(l10n.filterOffline, offline),
                       selected: _isSelected({
                         VehicleStatus.unknown,
                         VehicleStatus.expired,
@@ -1011,6 +998,7 @@ class _InlineErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1030,7 +1018,7 @@ class _InlineErrorBanner extends StatelessWidget {
               style: const TextStyle(fontSize: 14),
             ),
           ),
-          TextButton(onPressed: onRetry, child: const Text('Retry')),
+          TextButton(onPressed: onRetry, child: Text(l10n.retry)),
         ],
       ),
     );
@@ -1078,11 +1066,7 @@ class _VehicleCard extends StatelessWidget {
                   color: theme.colorScheme.primary.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  icon,
-                  color: theme.colorScheme.primary,
-                  size: 22,
-                ),
+                child: Icon(icon, color: theme.colorScheme.primary, size: 22),
               ),
               const SizedBox(height: 4),
               Text(
@@ -1102,6 +1086,7 @@ class _VehicleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final ignitionOn = vehicle.ignition == true;
     final ignitionUnknown = vehicle.ignition == null;
     final speedIsLive = vehicle.status == VehicleStatus.live;
@@ -1121,9 +1106,8 @@ class _VehicleCard extends StatelessWidget {
                     category: vehicle.category,
                     size: 22,
                     color: AppColors.statusColor(vehicle.status),
-                    tileColor: AppColors.statusColor(
-                      vehicle.status,
-                    ).withValues(alpha: 0.12),
+                    tileColor: AppColors.statusColor(vehicle.status)
+                        .withValues(alpha: 0.12),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -1214,7 +1198,7 @@ class _VehicleCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          lastUpdatedLabel(vehicle),
+                          l10n.lastUpdatedLabel(vehicle),
                           style: theme.textTheme.bodySmall,
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
@@ -1236,16 +1220,11 @@ class _VehicleCard extends StatelessWidget {
                   _action(
                     context,
                     Icons.navigation_outlined,
-                    'Navigate',
+                    l10n.navigate,
                     onNavigate,
                   ),
-                  _action(
-                    context,
-                    Icons.share_outlined,
-                    'Share',
-                    onShare,
-                  ),
-                  _action(context, Icons.map_outlined, 'Map', onMap),
+                  _action(context, Icons.share_outlined, l10n.share, onShare),
+                  _action(context, Icons.map_outlined, l10n.mapAction, onMap),
                 ],
               ),
             ],

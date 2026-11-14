@@ -6,8 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/saved_vehicle.dart';
 import '../models/theme_seed.dart';
+import '../providers/locale_provider.dart';
+import '../providers/notification_provider.dart';
 import '../providers/registry_provider.dart';
 import '../providers/saved_vehicles_provider.dart';
 import '../providers/storage_provider.dart';
@@ -19,8 +22,8 @@ import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
 import '../widgets/vehicle_category_icon.dart';
 
-/// Settings: appearance, refresh interval, saved vehicles, provider
-/// status, backup & restore, and app info.
+/// Settings: appearance, language, notifications, refresh interval,
+/// saved vehicles, provider status, backup & restore, and app info.
 ///
 /// Everything here is shared state from providers — theme from
 /// [themeProvider], the refresh interval from [trackerProvider], the
@@ -36,41 +39,34 @@ class SettingsScreen extends ConsumerWidget {
     Duration(minutes: 5),
   ];
 
-  String _intervalLabel(Duration interval) {
-    if (interval.inSeconds < 60) return '${interval.inSeconds}s';
-    if (interval.inMinutes == 1) return '1 min';
-    return '${interval.inMinutes} min';
-  }
-
-  String _intervalPlainLabel(Duration interval) {
-    if (interval.inSeconds < 60) {
-      return 'Every ${interval.inSeconds} seconds';
-    }
-    if (interval.inMinutes == 1) return 'Every minute';
-    return 'Every ${interval.inMinutes} minutes';
-  }
+  /// Text shared by the "Share UniTrack" row: app name, one-liner,
+  /// and the releases page.
+  static const _shareText =
+      'UniTrack – Universal GPS Tracker\n'
+      'Track all your vehicles in one app.\n'
+      'https://github.com/nuvishh/UniTrack/releases';
 
   Future<void> _deleteVehicle(
     BuildContext context,
     WidgetRef ref,
     SavedVehicle vehicle,
   ) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove vehicle?'),
+        title: Text(l10n.removeVehicleTitle),
         content: Text(
-          'Remove ${vehicle.displayName ?? vehicle.deviceId} and delete '
-          'its stored credentials?',
+          l10n.removeVehicleContent(vehicle.displayName ?? vehicle.deviceId),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Remove'),
+            child: Text(l10n.remove),
           ),
         ],
       ),
@@ -85,6 +81,7 @@ class SettingsScreen extends ConsumerWidget {
   /// and opens the share sheet. A warning is shown first: the file
   /// contains API keys and passwords in plain text.
   Future<void> _exportBackup(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
     final storage = ref.read(secureStorageServiceProvider);
     final vehicles = await ref.read(savedVehiclesProvider.future);
     final items = <BackupVehicle>[];
@@ -104,30 +101,23 @@ class SettingsScreen extends ConsumerWidget {
     }
     if (!context.mounted) return;
     if (items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nothing to back up yet.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.nothingToBackup)));
       return;
     }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Export contains your keys'),
-        content: Text(
-          'This backup file contains your API keys and passwords in '
-          'plain text — ${items.length} vehicle${items.length == 1 ? '' : 's'}. '
-          'Anyone with the file can track your vehicles.\n\n'
-          'Keep it private: store it somewhere safe and never send '
-          'it to anyone.',
-        ),
+        title: Text(l10n.exportKeysTitle),
+        content: Text(l10n.exportKeysContent(items.length)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Export anyway'),
+            child: Text(l10n.exportAnyway),
           ),
         ],
       ),
@@ -156,6 +146,7 @@ class SettingsScreen extends ConsumerWidget {
   /// Imports a backup JSON file: validates strictly, skips
   /// duplicates, restores the rest, then refreshes the fleet.
   Future<void> _importBackup(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
     final picked = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json'],
@@ -166,9 +157,8 @@ class SettingsScreen extends ConsumerWidget {
       bytes = await picked.first.readAsBytes();
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not read that file.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.couldNotReadFile)));
       return;
     }
     List<BackupVehicle> imported;
@@ -176,17 +166,13 @@ class SettingsScreen extends ConsumerWidget {
       imported = parseBackup(utf8.decode(bytes));
     } on BackupFormatException catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
       return;
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not read this backup file.'),
-        ),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.couldNotReadBackup)));
       return;
     }
     final existing = await ref.read(savedVehiclesProvider.future);
@@ -224,19 +210,26 @@ class SettingsScreen extends ConsumerWidget {
     final importedCount = plan.fresh.length;
     final message = importedCount == 0
         ? plan.skipped == 0
-              ? 'This backup has no vehicles to import.'
-              : 'Nothing new — all ${plan.skipped} vehicle${plan.skipped == 1 ? '' : 's'} '
-                    'are already saved.'
-        : '$importedCount imported'
-              '${plan.skipped == 0 ? '' : ', ${plan.skipped} skipped as duplicate${plan.skipped == 1 ? '' : 's'}'}.';
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+              ? l10n.backupNoVehicles
+              : l10n.backupNothingNew(plan.skipped)
+        : l10n.importResultMessage(importedCount, plan.skipped);
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Shares the app link (releases page) via the system share sheet.
+  Future<void> _shareApp() async {
+    await SharePlus.instance.share(ShareParams(text: _shareText));
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final themeMode = ref.watch(themeProvider);
     final themeSeed = ref.watch(themeSeedProvider);
+    final appLocale = ref.watch(localeProvider);
+    final alertSettings = ref.watch(alertSettingsProvider);
     final refreshInterval = ref.watch(
       trackerProvider.select((s) => s.refreshInterval),
     );
@@ -254,9 +247,9 @@ class SettingsScreen extends ConsumerWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Settings'),
+            Text(l10n.settingsTitle),
             Text(
-              'Material You theme, polling intervals & providers',
+              l10n.settingsSubtitle,
               style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
             ),
           ],
@@ -265,23 +258,23 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          const SectionHeader(title: 'Appearance'),
+          SectionHeader(title: l10n.appearance),
           SegmentedButton<ThemeMode>(
-            segments: const [
+            segments: [
               ButtonSegment(
                 value: ThemeMode.light,
-                icon: Icon(Icons.light_mode_outlined),
-                label: Text('Light'),
+                icon: const Icon(Icons.light_mode_outlined),
+                label: Text(l10n.themeLight),
               ),
               ButtonSegment(
                 value: ThemeMode.dark,
-                icon: Icon(Icons.dark_mode_outlined),
-                label: Text('Dark'),
+                icon: const Icon(Icons.dark_mode_outlined),
+                label: Text(l10n.themeDark),
               ),
               ButtonSegment(
                 value: ThemeMode.system,
-                icon: Icon(Icons.phone_android_outlined),
-                label: Text('System'),
+                icon: const Icon(Icons.phone_android_outlined),
+                label: Text(l10n.themeSystem),
               ),
             ],
             selected: {themeMode},
@@ -290,7 +283,7 @@ class SettingsScreen extends ConsumerWidget {
             },
           ),
           const SizedBox(height: 24),
-          const SectionHeader(title: 'Colour theme'),
+          SectionHeader(title: l10n.colourTheme),
           Wrap(
             spacing: 10,
             runSpacing: 10,
@@ -298,8 +291,7 @@ class SettingsScreen extends ConsumerWidget {
               final selected = seed.id == themeSeed.id;
               final scheme = theme.colorScheme;
               return InkWell(
-                onTap: () =>
-                    ref.read(themeSeedProvider.notifier).setSeed(seed),
+                onTap: () => ref.read(themeSeedProvider.notifier).setSeed(seed),
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -324,9 +316,7 @@ class SettingsScreen extends ConsumerWidget {
                         decoration: BoxDecoration(
                           color: seed.swatch,
                           shape: BoxShape.circle,
-                          border: Border.all(
-                            color: scheme.outlineVariant,
-                          ),
+                          border: Border.all(color: scheme.outlineVariant),
                         ),
                         child: selected
                             ? Icon(
@@ -352,18 +342,83 @@ class SettingsScreen extends ConsumerWidget {
             }).toList(),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Applies immediately, in both light and dark mode.',
-            style: theme.textTheme.bodySmall,
+          Text(l10n.themeAppliesNote, style: theme.textTheme.bodySmall),
+          const SizedBox(height: 24),
+          SectionHeader(title: l10n.language),
+          SegmentedButton<AppLocale>(
+            segments: [
+              ButtonSegment(
+                value: AppLocale.system,
+                label: Text(l10n.languageSystem),
+              ),
+              ButtonSegment(
+                value: AppLocale.english,
+                label: Text(l10n.languageEnglish),
+              ),
+              ButtonSegment(
+                value: AppLocale.malayalam,
+                label: Text(l10n.languageMalayalam),
+              ),
+            ],
+            selected: {appLocale},
+            onSelectionChanged: (selected) {
+              ref.read(localeProvider.notifier).setLocale(selected.first);
+            },
           ),
           const SizedBox(height: 24),
-          const SectionHeader(title: 'Refresh interval'),
+          SectionHeader(title: l10n.notifications),
+          Card(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: Text(l10n.vehicleAlerts),
+                  subtitle: Text(l10n.vehicleAlertsSubtitle),
+                  value: alertSettings.master,
+                  onChanged: (value) =>
+                      ref.read(alertSettingsProvider.notifier).setMaster(value),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  title: Text(l10n.ignitionChanges),
+                  subtitle: Text(l10n.ignitionChangesSubtitle),
+                  value: alertSettings.ignition,
+                  onChanged: alertSettings.master
+                      ? (value) => ref
+                            .read(alertSettingsProvider.notifier)
+                            .setIgnition(value)
+                      : null,
+                ),
+                SwitchListTile(
+                  title: Text(l10n.overspeed),
+                  subtitle: Text(l10n.overspeedSubtitle),
+                  value: alertSettings.overspeed,
+                  onChanged: alertSettings.master
+                      ? (value) => ref
+                            .read(alertSettingsProvider.notifier)
+                            .setOverspeed(value)
+                      : null,
+                ),
+                SwitchListTile(
+                  title: Text(l10n.offlineAlerts),
+                  subtitle: Text(l10n.offlineAlertsSubtitle),
+                  value: alertSettings.offline,
+                  onChanged: alertSettings.master
+                      ? (value) => ref
+                            .read(alertSettingsProvider.notifier)
+                            .setOffline(value)
+                      : null,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          SectionHeader(title: l10n.refreshInterval),
           SegmentedButton<Duration>(
             segments: _intervals
                 .map(
                   (interval) => ButtonSegment(
                     value: interval,
-                    label: Text(_intervalLabel(interval)),
+                    label: Text(l10n.intervalLabel(interval)),
                   ),
                 )
                 .toList(),
@@ -376,32 +431,29 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '${_intervalPlainLabel(refreshInterval)} — '
-            'providers enforce their own minimum poll interval on top '
-            'of this (SimplyTrack: 60s, Aargee: 60s).',
+            l10n.refreshIntervalNote(
+              refreshInterval.inSeconds < 60
+                  ? l10n.everySeconds(refreshInterval.inSeconds)
+                  : l10n.everyMinutes(refreshInterval.inMinutes),
+            ),
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 24),
-          const SectionHeader(title: 'Backup & restore'),
+          SectionHeader(title: l10n.backupRestore),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Reinstalling the app wipes saved vehicles and '
-                    'credentials. Export a backup first, then import it '
-                    'after reinstalling.',
-                    style: theme.textTheme.bodyMedium,
-                  ),
+                  Text(l10n.backupCardText, style: theme.textTheme.bodyMedium),
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
                       onPressed: () => _exportBackup(context, ref),
                       icon: const Icon(Icons.download_outlined),
-                      label: const Text('Export configuration'),
+                      label: Text(l10n.exportConfig),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -410,23 +462,18 @@ class SettingsScreen extends ConsumerWidget {
                     child: OutlinedButton.icon(
                       onPressed: () => _importBackup(context, ref),
                       icon: const Icon(Icons.upload_outlined),
-                      label: const Text('Import configuration'),
+                      label: Text(l10n.importConfig),
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'The backup file contains your API keys and '
-                    'passwords in plain text — keep it private and '
-                    'never send it to anyone.',
-                    style: theme.textTheme.bodySmall,
-                  ),
+                  Text(l10n.backupWarning, style: theme.textTheme.bodySmall),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 24),
           SectionHeader(
-            title: 'Saved vehicles',
+            title: l10n.savedVehicles,
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -445,12 +492,10 @@ class SettingsScreen extends ConsumerWidget {
           savedVehicles.when(
             data: (vehicles) {
               if (vehicles.isEmpty) {
-                return const EmptyState(
+                return EmptyState(
                   icon: Icons.directions_bus_outlined,
-                  title: 'No vehicles saved yet',
-                  message:
-                      'Vehicles you add will appear here, with their '
-                      'provider and device ID.',
+                  title: l10n.noSavedVehicles,
+                  message: l10n.noVehiclesSavedMessage,
                 );
               }
               return Column(
@@ -471,12 +516,10 @@ class SettingsScreen extends ConsumerWidget {
                           ).withValues(alpha: 0.14),
                         ),
                         title: Text(vehicle.displayName ?? vehicle.deviceId),
-                        subtitle: Text(
-                          '$displayName · ${vehicle.deviceId}',
-                        ),
+                        subtitle: Text('$displayName · ${vehicle.deviceId}'),
                         trailing: IconButton(
                           icon: const Icon(Icons.delete_outline),
-                          tooltip: 'Remove',
+                          tooltip: l10n.remove,
                           onPressed: () =>
                               _deleteVehicle(context, ref, vehicle),
                         ),
@@ -491,13 +534,13 @@ class SettingsScreen extends ConsumerWidget {
               child: Center(child: CircularProgressIndicator()),
             ),
             error: (error, _) => ErrorStateCard(
-              message: "Couldn't load the saved vehicles. $error",
+              message: l10n.couldNotLoadSaved('$error'),
               onRetry: () => ref.invalidate(savedVehiclesProvider),
             ),
           ),
           const SizedBox(height: 24),
           SectionHeader(
-            title: 'Providers',
+            title: l10n.providers,
             trailing: TextButton.icon(
               onPressed: registryState.isRefreshing
                   ? null
@@ -510,15 +553,14 @@ class SettingsScreen extends ConsumerWidget {
                         SnackBar(
                           content: Text(
                             ok
-                                ? 'Provider list updated.'
-                                : 'Could not reach the provider list — '
-                                      'using the built-in providers.',
+                                ? l10n.providerListUpdated
+                                : l10n.providerListOffline,
                           ),
                         ),
                       );
                     },
               icon: const Icon(Icons.refresh, size: 18),
-              label: const Text('Refresh providers'),
+              label: Text(l10n.refreshProviders),
             ),
           ),
           if (registryState.registry != null)
@@ -526,10 +568,8 @@ class SettingsScreen extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: 10),
               child: Text(
                 registryState.source == RegistrySource.remote
-                    ? 'Provider list fetched just now (v${registryState.registry!.version}).'
-                    : 'Provider list from cache '
-                          '(v${registryState.registry!.version}) — '
-                          'refreshed every 24h.',
+                    ? l10n.providerListRemote(registryState.registry!.version)
+                    : l10n.providerListCached(registryState.registry!.version),
                 style: theme.textTheme.bodySmall,
               ),
             )
@@ -537,8 +577,7 @@ class SettingsScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Text(
-                'Using the built-in providers — the remote provider '
-                'list could not be loaded (offline or unavailable).',
+                l10n.providerListBuiltin,
                 style: theme.textTheme.bodySmall,
               ),
             ),
@@ -575,7 +614,7 @@ class SettingsScreen extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            'Remote',
+                            l10n.remoteBadge,
                             style: TextStyle(
                               color: theme.colorScheme.onSecondaryContainer,
                               fontWeight: FontWeight.w800,
@@ -592,7 +631,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 24),
-          const SectionHeader(title: 'About'),
+          SectionHeader(title: l10n.about),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -621,7 +660,7 @@ class SettingsScreen extends ConsumerWidget {
                           children: [
                             Text('UniTrack', style: theme.textTheme.titleLarge),
                             Text(
-                              'Version 1.3.1 (build 15)',
+                              l10n.versionLabel('1.4.0 (build 16)'),
                               style: theme.textTheme.bodySmall,
                             ),
                           ],
@@ -630,20 +669,24 @@ class SettingsScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    'Universal GPS tracker — one fleet across Transight, '
-                    'Aargee, LiveTrace, Mercydatrack, Mercydatrack '
-                    '(4G), PauldeaTrack, SimplyTrack and HashTrace.',
-                    style: theme.textTheme.bodyMedium,
-                  ),
+                  Text(l10n.aboutText, style: theme.textTheme.bodyMedium),
                   const SizedBox(height: 8),
-                  Text(
-                    'Credentials are stored only on this device, in '
-                    'secure storage. No backend, no analytics.',
-                    style: theme.textTheme.bodySmall,
-                  ),
+                  Text(l10n.aboutPrivacy, style: theme.textTheme.bodySmall),
                 ],
               ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: ListTile(
+              leading: Icon(
+                Icons.share_outlined,
+                color: theme.colorScheme.primary,
+              ),
+              title: Text(l10n.shareApp),
+              subtitle: Text(l10n.shareAppSubtitle),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _shareApp,
             ),
           ),
         ],

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/provider_credentials.dart';
 import '../models/provider_descriptor.dart';
 import '../models/saved_vehicle.dart';
@@ -122,6 +123,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
   }
 
   Future<void> _testConnection() async {
+    final l10n = AppLocalizations.of(context);
     setState(() {
       _testState = _TestState.testing;
       _testedOk = false;
@@ -137,10 +139,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
       if (vehicles.isEmpty) {
         setState(() {
           _testState = _TestState.error;
-          _testMessage =
-              'Connected, but the account returned no '
-              'vehicles. Check the device ID — it must match a vehicle '
-              'registered under this account.';
+          _testMessage = l10n.noVehiclesError;
         });
         return;
       }
@@ -159,7 +158,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
       if (!mounted) return;
       setState(() {
         _testState = _TestState.error;
-        _testMessage = e.message ?? 'Not supported yet.';
+        _testMessage = e.message ?? l10n.notSupportedYet;
       });
     } on TimeoutException {
       // The provider clients give up after 20s (30s for Aargee); on a
@@ -169,9 +168,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
       if (!mounted) return;
       setState(() {
         _testState = _TestState.error;
-        _testMessage =
-            'The provider took too long to answer. Check your internet '
-            'connection and tap Test again.';
+        _testMessage = l10n.timeoutError;
       });
     } on IOException {
       // Covers SocketException and ClientException (no route to host,
@@ -179,23 +176,19 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
       if (!mounted) return;
       setState(() {
         _testState = _TestState.error;
-        _testMessage =
-            'Could not reach ${_descriptor.displayName} — check your '
-            'internet connection and try again.';
+        _testMessage = l10n.unreachableError(_descriptor.displayName);
       });
     } on FormatException {
       if (!mounted) return;
       setState(() {
         _testState = _TestState.error;
-        _testMessage =
-            'The provider returned an unexpected response. Try again, '
-            'or check the API key.';
+        _testMessage = l10n.unexpectedResponseError;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _testState = _TestState.error;
-        _testMessage = 'Connection failed: $e';
+        _testMessage = l10n.connectionFailedDetail('$e');
       });
     }
   }
@@ -247,16 +240,16 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
     });
   }
 
-  String _authDescription(String authKind) {
+  String _authDescription(AppLocalizations l10n, String authKind) {
     switch (authKind) {
       case 'apiKey':
-        return 'Signs in with one API key';
+        return l10n.authApiKey;
       case 'userIdAndKey':
-        return 'Signs in with a user ID + key';
+        return l10n.authUserIdAndKey;
       case 'usernamePassword':
-        return 'Signs in with username + password';
+        return l10n.authUsernamePassword;
       default:
-        return 'Signs in with its own credentials';
+        return l10n.authDefault;
     }
   }
 
@@ -275,6 +268,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return PopScope(
       // Embedded as a tab there is no route to pop from step 1 —
       // the back button goes to Fleet instead (see [_handleBack]).
@@ -286,10 +280,10 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            tooltip: _step == 0 ? 'Back' : 'Previous step',
+            tooltip: _step == 0 ? l10n.back : l10n.previousStep,
             onPressed: _handleBack,
           ),
-          title: const Text('Add vehicle'),
+          title: Text(l10n.addVehicleTitle),
         ),
         body: Form(
           key: _formKey,
@@ -301,7 +295,11 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                   children: [
                     StepIndicator(
                       currentStep: _step,
-                      labels: const ['Provider', 'Details', 'Test & save'],
+                      labels: [
+                        l10n.stepProvider,
+                        l10n.stepDetails,
+                        l10n.testAndSave,
+                      ],
                     ),
                     const SizedBox(height: 20),
                     if (_step == 0) _buildProviderStep(),
@@ -322,6 +320,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
   /// at the bottom instead of scrolling away with the form.
   Widget _buildBottomBar() {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
@@ -347,7 +346,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
               onPressed: () => _goToStep(1),
               icon: const Icon(Icons.arrow_forward),
               iconAlignment: IconAlignment.end,
-              label: const Text('Continue'),
+              label: Text(l10n.continueLabel),
             ),
           ),
           // Step 1: the primary action is full-width like every
@@ -362,7 +361,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () => _goToStep(0),
-                  child: const Text('Back'),
+                  child: Text(l10n.back),
                 ),
               ),
               const SizedBox(height: 12),
@@ -372,7 +371,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                   onPressed: _continueFromDetails,
                   icon: const Icon(Icons.arrow_forward),
                   iconAlignment: IconAlignment.end,
-                  label: const Text('Continue'),
+                  label: Text(l10n.continueLabel),
                 ),
               ),
             ],
@@ -389,10 +388,10 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                   icon: const Icon(Icons.wifi_tethering_outlined),
                   label: Text(
                     _testState == _TestState.testing
-                        ? 'Testing…'
+                        ? l10n.testing
                         : _testState == _TestState.error
-                        ? 'Test again'
-                        : 'Test connection',
+                        ? l10n.testAgain
+                        : l10n.testConnection,
                   ),
                 ),
               ),
@@ -402,17 +401,13 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                 child: FilledButton.icon(
                   onPressed: _testedOk && !_saving ? _save : null,
                   icon: const Icon(Icons.save_outlined),
-                  label: Text(_saving ? 'Saving…' : 'Save vehicle'),
+                  label: Text(_saving ? l10n.saving : l10n.saveVehicle),
                 ),
               ),
               if (!_testedOk)
-                const Padding(
-                  padding: EdgeInsets.only(top: 10),
-                  child: Text(
-                    'Test the connection first — Save unlocks after a '
-                    'successful test.',
-                    textAlign: TextAlign.center,
-                  ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(l10n.testFirstNote, textAlign: TextAlign.center),
                 ),
             ],
           ),
@@ -423,18 +418,15 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
 
   Widget _buildProviderStep() {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final descriptors = ref.watch(providerDescriptorsProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Which GPS provider is this vehicle on?',
-          style: theme.textTheme.titleLarge,
-        ),
+        Text(l10n.step1Title, style: theme.textTheme.titleLarge),
         const SizedBox(height: 6),
         Text(
-          'Each provider has its own API. Pick the one the vehicle\'s '
-          'tracker is registered with.',
+          l10n.step1Hint2,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -497,13 +489,12 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                                       vertical: 3,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: theme
-                                          .colorScheme
-                                          .secondaryContainer,
+                                      color:
+                                          theme.colorScheme.secondaryContainer,
                                       borderRadius: BorderRadius.circular(999),
                                     ),
                                     child: Text(
-                                      'Remote',
+                                      l10n.remoteBadge,
                                       style: TextStyle(
                                         color: theme
                                             .colorScheme
@@ -518,17 +509,17 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _authDescription(descriptor.authKind),
+                              _authDescription(l10n, descriptor.authKind),
                               style: theme.textTheme.bodySmall,
                             ),
                             if (descriptor.supportsHistory)
                               Text(
-                                'Live tracking + history',
+                                l10n.livePlusHistory,
                                 style: theme.textTheme.bodySmall,
                               )
                             else
                               Text(
-                                'Live tracking only (no history)',
+                                l10n.liveOnly,
                                 style: theme.textTheme.bodySmall,
                               ),
                           ],
@@ -556,17 +547,18 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
 
   Widget _buildDetailsStep() {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final descriptor = _descriptor;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Enter ${descriptor.displayName} credentials',
+          l10n.enterCredentialsTitle(descriptor.displayName),
           style: theme.textTheme.titleLarge,
         ),
         const SizedBox(height: 6),
         Text(
-          'These stay only on this device, in secure storage.',
+          l10n.step2Subtitle,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -587,9 +579,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '${descriptor.displayName} is not verified yet — '
-                      'its endpoint paths are not confirmed. Test '
-                      'connection will explain what is missing.',
+                      l10n.notVerifiedWarning(descriptor.displayName),
                       style: theme.textTheme.bodyMedium,
                     ),
                   ),
@@ -605,10 +595,10 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
           decoration: InputDecoration(
             labelText: descriptor.deviceIdLabel,
             hintText: descriptor.deviceIdHint,
-            helperText: 'This identifies the vehicle at the provider.',
+            helperText: l10n.deviceIdHelper,
           ),
           validator: (value) =>
-              value == null || value.trim().isEmpty ? 'Required' : null,
+              value == null || value.trim().isEmpty ? l10n.required : null,
           onChanged: (_) {
             if (_testedOk) _resetTest();
           },
@@ -620,19 +610,19 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
           decoration: InputDecoration(
             labelText: descriptor.secretLabel,
             hintText: descriptor.secretHint,
-            helperText: 'Never shared — stored only on this device.',
+            helperText: l10n.secretHelper,
             suffixIcon: IconButton(
               icon: Icon(
                 _secretVisible
                     ? Icons.visibility_off_outlined
                     : Icons.visibility_outlined,
               ),
-              tooltip: _secretVisible ? 'Hide' : 'Show',
+              tooltip: _secretVisible ? l10n.hide : l10n.show,
               onPressed: () => setState(() => _secretVisible = !_secretVisible),
             ),
           ),
           validator: (value) =>
-              value == null || value.trim().isEmpty ? 'Required' : null,
+              value == null || value.trim().isEmpty ? l10n.required : null,
           onChanged: (_) {
             if (_testedOk) _resetTest();
           },
@@ -641,24 +631,24 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
         TextFormField(
           controller: _regNoController,
           textCapitalization: TextCapitalization.characters,
-          decoration: const InputDecoration(
-            labelText: 'Registration number (optional)',
-            hintText: 'Used for display and fallback matching',
+          decoration: InputDecoration(
+            labelText: l10n.regNoLabel,
+            hintText: l10n.regNoHint,
           ),
         ),
         const SizedBox(height: 16),
         TextFormField(
           controller: _displayNameController,
-          decoration: const InputDecoration(
-            labelText: 'Display name (optional)',
-            hintText: 'Friendly name for the fleet list',
+          decoration: InputDecoration(
+            labelText: l10n.displayNameOptionalLabel,
+            hintText: l10n.displayNameOptionalHint,
           ),
         ),
         const SizedBox(height: 24),
-        Text('Vehicle type', style: theme.textTheme.titleMedium),
+        Text(l10n.vehicleType, style: theme.textTheme.titleMedium),
         const SizedBox(height: 4),
         Text(
-          'Shown as an icon on fleet cards and the map.',
+          l10n.vehicleTypeHint,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -675,7 +665,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                 children: [
                   Icon(category.icon, size: 18),
                   const SizedBox(width: 6),
-                  Text(category.label),
+                  Text(l10n.categoryLabel(category)),
                 ],
               ),
               selected: selected,
@@ -689,17 +679,17 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
 
   Widget _buildTestStep() {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final descriptor = _descriptor;
     final deviceId = _deviceIdController.text.trim();
     final regNo = _regNoController.text.trim();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Test the connection', style: theme.textTheme.titleLarge),
+        Text(l10n.testStepTitle, style: theme.textTheme.titleLarge),
         const SizedBox(height: 6),
         Text(
-          'We\'ll contact ${descriptor.displayName} with these credentials '
-          'before saving anything.',
+          l10n.testStepHint(descriptor.displayName),
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -761,32 +751,27 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                     size: 26,
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Tap "Test connection" — if the provider answers '
-                      'with your vehicle, Save unlocks.',
-                    ),
-                  ),
+                  Expanded(child: Text(l10n.testIdleHint)),
                 ],
               ),
             ),
           ),
         if (_testState == _TestState.testing)
-          const Card(
+          Card(
             child: Padding(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  SizedBox(
+                  const SizedBox(
                     width: 24,
                     height: 24,
                     child: CircularProgressIndicator(strokeWidth: 3),
                   ),
-                  SizedBox(width: 14),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Text(
-                      'Contacting the provider…',
-                      style: TextStyle(
+                      l10n.contactingProvider,
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
@@ -823,15 +808,17 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Connected!',
+                          l10n.connectedTitle,
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: AppColors.live,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '$_testCount vehicle${_testCount == 1 ? '' : 's'} '
-                          'found on ${descriptor.displayName}.',
+                          l10n.vehiclesFound(
+                            _testCount,
+                            descriptor.displayName,
+                          ),
                           style: theme.textTheme.bodyMedium,
                         ),
                       ],
@@ -863,14 +850,14 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Connection failed',
+                              l10n.connectionFailed,
                               style: theme.textTheme.titleMedium?.copyWith(
                                 color: AppColors.error,
                               ),
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              _testMessage ?? 'Unknown error.',
+                              _testMessage ?? l10n.unknownError,
                               style: theme.textTheme.bodyMedium,
                             ),
                           ],
@@ -879,22 +866,17 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Text('What to check:', style: theme.textTheme.titleSmall),
+                  Text(l10n.whatToCheck, style: theme.textTheme.titleSmall),
                   const SizedBox(height: 4),
-                  const Text('• The API key / password is copied correctly'),
-                  const Text('• The device ID matches the provider account'),
-                  const Text('• The vehicle is registered under this account'),
+                  Text(l10n.checkApiKey),
+                  Text(l10n.checkDeviceId),
+                  Text(l10n.checkRegistered),
                 ],
               ),
             ),
           ),
         const SizedBox(height: 16),
-        const Text(
-          'Credentials are stored only on this device, in secure '
-          'storage. They are never uploaded anywhere except the '
-          'provider\'s own API.',
-          textAlign: TextAlign.center,
-        ),
+        Text(l10n.credentialsPrivacy, textAlign: TextAlign.center),
       ],
     );
   }

@@ -6,10 +6,10 @@ import '../models/vehicle.dart';
 
 /// UniTrack design system.
 ///
-/// Material You (v1.3.0): four switchable M3 seed palettes (Ocean
-/// Slate default, Sage Emerald, Indigo Dusk, Terracotta — see
-/// [ThemeSeed]), with Plus Jakarta Sans for UI text and JetBrains Mono
-/// for reg numbers / mono labels. No gradients anywhere — surfaces
+/// Material You (v1.3.0): five switchable M3 seed palettes (Royal
+/// Violet default since v1.4.0, Ocean Slate, Sage Emerald, Indigo Dusk,
+/// Terracotta — see [ThemeSeed]), with Poppins for UI text and
+/// JetBrains Mono for reg numbers / mono labels. No gradients anywhere — surfaces
 /// are tonal (primaryContainer / secondaryContainer / surface
 /// containers) and status reads through the emerald / amber / slate
 /// status colours.
@@ -19,9 +19,9 @@ import '../models/vehicle.dart';
 /// (dark). The bottom navigation is an 80px M3 bar with a
 /// secondaryContainer active pill.
 ///
-/// NOTE on google_fonts 9: `GoogleFonts.plusJakartaSansTextTheme`
+/// NOTE on google_fonts 9: `GoogleFonts.poppinsTextTheme`
 /// takes the `material_ui` fork's TextTheme, not Flutter's, so the
-/// font is applied per TextStyle instead (see [_jakarta]).
+/// font is applied per TextStyle instead (see [_poppins]).
 class AppColors {
   // Fleet status — prototype: Live emerald-500, Idle amber-500,
   // Offline slate-400 (not rose). Both "offline" states (unknown
@@ -88,15 +88,15 @@ class AppColors {
 /// colours or text styles in screens.
 ///
 /// Material You, seed-parameterised: tonal surfaces, secondaryContainer
-/// active-pill navigation, pill buttons, and Plus Jakarta Sans
+/// active-pill navigation, pill buttons, and Poppins
 /// throughout (JetBrains Mono for reg numbers via [mono]).
 class AppTheme {
   static const double cardRadius = 24;
   static const double fieldRadius = 16;
 
-  /// The default (Ocean Slate) themes.
-  static ThemeData get light => lightFor(ThemeSeed.ocean);
-  static ThemeData get dark => darkFor(ThemeSeed.ocean);
+  /// The default (Royal Violet) themes.
+  static ThemeData get light => lightFor(ThemeSeed.royal);
+  static ThemeData get dark => darkFor(ThemeSeed.royal);
 
   static ThemeData lightFor(ThemeSeed seed) => _build(Brightness.light, seed);
   static ThemeData darkFor(ThemeSeed seed) => _build(Brightness.dark, seed);
@@ -115,11 +115,11 @@ class AppTheme {
     height: height,
   );
 
-  /// Applies Plus Jakarta Sans to one text style. (google_fonts 9's
+  /// Applies Poppins to one text style. (google_fonts 9's
   /// `*TextTheme` helpers take the `material_ui` fork's TextTheme,
   /// not Flutter's, so the font is applied style by style.)
-  static TextStyle _jakarta(TextStyle style) =>
-      GoogleFonts.plusJakartaSans(textStyle: style);
+  static TextStyle _poppins(TextStyle style) =>
+      GoogleFonts.poppins(textStyle: style);
 
   static ThemeData _build(Brightness brightness, ThemeSeed seed) {
     final isDark = brightness == Brightness.dark;
@@ -176,7 +176,7 @@ class AppTheme {
       onInverseSurface: surface,
     );
 
-    final displayStyle = _jakarta(
+    final displayStyle = _poppins(
       TextStyle(
         fontSize: 44,
         fontWeight: FontWeight.w800,
@@ -187,10 +187,8 @@ class AppTheme {
     );
     final textTheme = TextTheme(
       displayLarge: displayStyle,
-      displayMedium: _jakarta(
-        displayStyle.copyWith(fontSize: 34),
-      ),
-      headlineMedium: _jakarta(
+      displayMedium: _poppins(displayStyle.copyWith(fontSize: 34)),
+      headlineMedium: _poppins(
         TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w800,
@@ -198,31 +196,31 @@ class AppTheme {
           letterSpacing: -0.5,
         ),
       ),
-      headlineSmall: _jakarta(
+      headlineSmall: _poppins(
         TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: onSurface),
       ),
-      titleLarge: _jakarta(
+      titleLarge: _poppins(
         TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: onSurface),
       ),
-      titleMedium: _jakarta(
+      titleMedium: _poppins(
         TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: onSurface),
       ),
-      titleSmall: _jakarta(
+      titleSmall: _poppins(
         TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: onSurface),
       ),
-      bodyLarge: _jakarta(
+      bodyLarge: _poppins(
         TextStyle(fontSize: 16, color: onSurface, height: 1.4),
       ),
-      bodyMedium: _jakarta(
+      bodyMedium: _poppins(
         TextStyle(fontSize: 15, color: onSurface, height: 1.4),
       ),
-      bodySmall: _jakarta(
+      bodySmall: _poppins(
         TextStyle(fontSize: 13, color: onSurfaceVariant, height: 1.4),
       ),
-      labelLarge: _jakarta(
+      labelLarge: _poppins(
         TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: onSurface),
       ),
-      labelMedium: _jakarta(
+      labelMedium: _poppins(
         TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w700,
@@ -246,7 +244,7 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.plusJakartaSans(
+        titleTextStyle: GoogleFonts.poppins(
           fontSize: 22,
           fontWeight: FontWeight.w800,
           color: onSurface,
@@ -256,8 +254,10 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: surfaceLow,
-        elevation: 0,
-        shadowColor: Colors.transparent,
+        // RingWise look (v1.4.0): soft purple-tinted shadow under
+        // white cards on the lavender surface.
+        elevation: 2,
+        shadowColor: const Color(0x146C4CF1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(cardRadius),
         ),
@@ -267,7 +267,7 @@ class AppTheme {
         style: FilledButton.styleFrom(
           minimumSize: const Size(0, 52),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          textStyle: GoogleFonts.plusJakartaSans(
+          textStyle: GoogleFonts.poppins(
             fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
@@ -278,7 +278,7 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(0, 52),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          textStyle: GoogleFonts.plusJakartaSans(
+          textStyle: GoogleFonts.poppins(
             fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
@@ -288,7 +288,7 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           minimumSize: const Size(0, 48),
-          textStyle: GoogleFonts.plusJakartaSans(
+          textStyle: GoogleFonts.poppins(
             fontSize: 15,
             fontWeight: FontWeight.w700,
           ),
@@ -326,12 +326,10 @@ class AppTheme {
         helperStyle: TextStyle(fontSize: 13, color: onSurfaceVariant),
       ),
       chipTheme: ChipThemeData(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         selectedColor: secondaryContainer,
         checkmarkColor: onSecondaryContainer,
-        labelStyle: GoogleFonts.plusJakartaSans(
+        labelStyle: GoogleFonts.poppins(
           fontSize: 13,
           fontWeight: FontWeight.w700,
         ),
@@ -394,9 +392,7 @@ class AppTheme {
           color: colorScheme.onInverseSurface,
           fontSize: 15,
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       dividerTheme: DividerThemeData(
         color: onSurfaceVariant.withValues(alpha: 0.25),
@@ -404,17 +400,14 @@ class AppTheme {
         space: 1,
       ),
       listTileTheme: ListTileThemeData(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 4,
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         iconColor: onSurfaceVariant,
-        titleTextStyle: GoogleFonts.plusJakartaSans(
+        titleTextStyle: GoogleFonts.poppins(
           fontSize: 16,
           fontWeight: FontWeight.w700,
           color: onSurface,
         ),
-        subtitleTextStyle: GoogleFonts.plusJakartaSans(
+        subtitleTextStyle: GoogleFonts.poppins(
           fontSize: 14,
           color: onSurfaceVariant,
         ),

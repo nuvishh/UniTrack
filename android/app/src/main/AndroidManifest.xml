@@ -5,6 +5,9 @@
          though the server is up (found 2026-11-11: the released
          v1.0.3 APK had no INTERNET permission in its manifest). -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- POST_NOTIFICATIONS: vehicle alerts (v1.4.0). Android 13+
+         also asks at runtime via the plugin. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="unitrack"
         android:name="${applicationName}"

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/provider_descriptor.dart';
 import '../providers/registry_provider.dart';
 import '../theme/app_theme.dart';
@@ -73,6 +74,7 @@ class ProviderStatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final verified = descriptor.verified;
     final color = verified ? AppColors.live : AppColors.idle;
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
@@ -90,7 +92,7 @@ class ProviderStatusPill extends StatelessWidget {
           ),
           const SizedBox(width: 5),
           Text(
-            verified ? 'Verified' : 'Setup needed',
+            verified ? l10n.providerVerified : l10n.providerSetupNeeded,
             style: TextStyle(
               color: color,
               fontWeight: FontWeight.w800,
@@ -189,6 +191,7 @@ class ErrorStateCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Card(
       color: AppColors.error.withValues(alpha: 0.1),
       child: Padding(
@@ -207,7 +210,7 @@ class ErrorStateCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Couldn\'t refresh the fleet',
+                    l10n.refreshErrorTitle,
                     style: theme.textTheme.titleMedium?.copyWith(
                       color: AppColors.error,
                     ),
@@ -218,7 +221,7 @@ class ErrorStateCard extends StatelessWidget {
                   OutlinedButton.icon(
                     onPressed: onRetry,
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
+                    label: Text(l10n.retry),
                   ),
                 ],
               ),

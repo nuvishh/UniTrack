@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/vehicle.dart';
 import '../theme/app_theme.dart';
-import '../utils/time_format.dart';
 
 /// Small coloured badge showing a vehicle's live state, with a pulsing
 /// dot while the vehicle is live so the fleet reads at a glance.
@@ -20,34 +20,30 @@ class VehicleStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final (String label, Color color, Color textColor, Color wash) =
-        switch (status) {
-          VehicleStatus.live => (
-            'Live',
-            AppColors.live,
-            isDark ? AppColors.liveTextDark : AppColors.liveTextLight,
-            AppColors.live.withValues(alpha: 0.12),
-          ),
-          VehicleStatus.idle => (
-            'Idle',
-            AppColors.idle,
-            isDark ? AppColors.idleTextDark : AppColors.idleTextLight,
-            AppColors.idle.withValues(alpha: 0.15),
-          ),
-          VehicleStatus.unknown => (
-            'Unknown',
-            theme.colorScheme.outline,
-            theme.colorScheme.onSurfaceVariant,
-            theme.colorScheme.surfaceContainerHigh,
-          ),
-          VehicleStatus.expired => (
-            'Expired',
-            theme.colorScheme.outline,
-            theme.colorScheme.onSurfaceVariant,
-            theme.colorScheme.surfaceContainerHigh,
-          ),
-        };
+    final (Color color, Color textColor, Color wash) = switch (status) {
+      VehicleStatus.live => (
+        AppColors.live,
+        isDark ? AppColors.liveTextDark : AppColors.liveTextLight,
+        AppColors.live.withValues(alpha: 0.12),
+      ),
+      VehicleStatus.idle => (
+        AppColors.idle,
+        isDark ? AppColors.idleTextDark : AppColors.idleTextLight,
+        AppColors.idle.withValues(alpha: 0.15),
+      ),
+      VehicleStatus.unknown => (
+        theme.colorScheme.outline,
+        theme.colorScheme.onSurfaceVariant,
+        theme.colorScheme.surfaceContainerHigh,
+      ),
+      VehicleStatus.expired => (
+        theme.colorScheme.outline,
+        theme.colorScheme.onSurfaceVariant,
+        theme.colorScheme.surfaceContainerHigh,
+      ),
+    };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -60,7 +56,7 @@ class VehicleStatusChip extends StatelessWidget {
           PulsingDot(color: color, pulsing: status == VehicleStatus.live),
           const SizedBox(width: 6),
           Text(
-            label,
+            l10n.statusLabel(status),
             style: TextStyle(
               color: textColor,
               fontWeight: FontWeight.w700,
@@ -157,23 +153,4 @@ class _PulsingDotState extends State<PulsingDot>
       },
     );
   }
-}
-
-/// Human-readable last-update text from a [Vehicle].
-///
-/// Relative time ("Updated 2 min ago") when the timestamp parsed,
-/// otherwise the provider's raw string.
-String lastUpdatedLabel(Vehicle vehicle) {
-  if (vehicle.lastUpdated != null) {
-    return 'Updated ${relativeTime(vehicle.lastUpdated)}';
-  }
-  if (vehicle.lastUpdatedRaw.isEmpty) return 'Last update unknown';
-  return 'Updated ${vehicle.lastUpdatedRaw}';
-}
-
-/// Speed text, or '—' when the provider did not report one.
-String speedLabel(Vehicle vehicle) {
-  final speed = vehicle.speedKmph;
-  if (speed == null) return '—';
-  return '${speed.toStringAsFixed(0)} km/h';
 }

@@ -59,7 +59,7 @@ final themeProvider = NotifierProvider<ThemeNotifier, ThemeMode>(
 ///
 /// Same mechanism as [ThemeNotifier]: SharedPreferences, key
 /// `unitrack_theme_seed_v1`. Unknown stored ids fall back to the
-/// default seed (ocean) via [ThemeSeed.fromId], so an old install
+/// default seed (royal) via [ThemeSeed.fromId], so an old install
 /// never breaks. The light/dark toggle from [themeProvider] works
 /// with every seed — the seed picks the palette, the mode picks
 /// the brightness.
@@ -70,9 +70,9 @@ class ThemeSeedNotifier extends Notifier<ThemeSeed> {
   @override
   ThemeSeed build() {
     // Load the saved seed in the background; the app uses the
-    // default (ocean) until it arrives.
+    // default (royal) until it arrives.
     unawaited(_load());
-    return ThemeSeed.ocean;
+    return ThemeSeed.royal;
   }
 
   Future<void> _load() async {
