@@ -19,8 +19,16 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // Core library desugaring (v1.4.0): flutter_local_notifications
+        // requires it — without this the release build fails at
+        // :app:checkReleaseAarMetadata. Same fix as Duezy v1.0.0.
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    dependencies {
+        coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     }
 
     signingConfigs {
