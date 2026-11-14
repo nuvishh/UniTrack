@@ -217,10 +217,17 @@ void main() {
         expect(find.text('Settings'), findsOneWidget);
         // The Colour theme picker (v1.3.0) pushes Backup & restore
         // below the fold on a short screen — scroll it into view;
-        // offscreen ListView children are not built.
+        // offscreen ListView children are not built. Scoped to the
+        // vertical Scrollable (the ListView's): the Google Maps key
+        // field (v1.5.0) adds a second, horizontal Scrollable (the
+        // TextField), which scrollUntilVisible would otherwise find
+        // ambiguously.
         await tester.scrollUntilVisible(
           find.text('Backup & restore'),
           200,
+          scrollable: find.byWidgetPredicate(
+            (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+          ),
         );
         expect(find.text('Backup & restore'), findsOneWidget);
         // The About card sits below the fold in a ListView — scroll
@@ -229,6 +236,9 @@ void main() {
         await tester.scrollUntilVisible(
           find.textContaining(RegExp(r'Version \d+\.\d+\.\d+')),
           200,
+          scrollable: find.byWidgetPredicate(
+            (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+          ),
         );
         expect(
           find.textContaining(RegExp(r'Version \d+\.\d+\.\d+')),

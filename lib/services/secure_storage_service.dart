@@ -21,6 +21,10 @@ class SecureStorageService {
   static const _intervalKey = 'unitrack_refresh_interval_seconds';
   static const _defaultIntervalSeconds = 60;
 
+  /// The user's own Google Maps API key (v1.5.0) — same treatment
+  /// as provider secrets: secure storage only, never logged.
+  static const _googleMapsApiKey = 'google_maps_api_key';
+
   final FlutterSecureStorage _secure = const FlutterSecureStorage();
 
   String _secretKey(String vehicleId) => 'unitrack_secret_$vehicleId';
@@ -64,6 +68,18 @@ class SecureStorageService {
   /// Reads the secret for a vehicle, or null when none was saved.
   Future<String?> readSecret(String vehicleId) =>
       _secure.read(key: _secretKey(vehicleId));
+
+  /// Reads the user's Google Maps API key, or null when none is saved.
+  Future<String?> readGoogleMapsApiKey() =>
+      _secure.read(key: _googleMapsApiKey);
+
+  /// Saves the user's Google Maps API key.
+  Future<void> saveGoogleMapsApiKey(String key) =>
+      _secure.write(key: _googleMapsApiKey, value: key);
+
+  /// Deletes the user's Google Maps API key.
+  Future<void> deleteGoogleMapsApiKey() =>
+      _secure.delete(key: _googleMapsApiKey);
 
   Future<Duration> getRefreshInterval() async {
     final prefs = await SharedPreferences.getInstance();

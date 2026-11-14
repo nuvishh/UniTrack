@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -11,11 +13,14 @@ import '../models/vehicle.dart';
 import '../providers/registry_provider.dart';
 import '../providers/tracker_provider.dart';
 import '../providers/trip_log_provider.dart';
+import '../services/map_mode.dart';
 import '../services/providers/gps_provider_client.dart';
+import '../services/trip_playback.dart';
 import '../services/trip_summary.dart';
 import '../theme/app_theme.dart';
 import '../utils/geo.dart';
 import '../widgets/app_widgets.dart';
+import '../widgets/osm_attribution.dart';
 import '../widgets/vehicle_category_icon.dart';
 import '../widgets/vehicle_status_chip.dart';
 import 'map_screen.dart';
@@ -83,6 +88,8 @@ class _LiveLocationMap extends StatelessWidget {
                         ),
                       ],
                     ),
+                    // ODbL attribution (v1.5.0).
+                    const OsmAttribution(),
                   ],
                 ),
               ),
@@ -120,6 +127,84 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
   String? _historyError;
   bool _loadingHistory = false;
 
+  /// Trip playback (v1.5.0): replays the loaded history on the route
+  /// map. The [TripPlayback] object holds the position and the math;
+  /// this timer steps it.
+  TripPlayback? _playback;
+  Timer? _playbackTimer;
+  bool _playing = false;
+  double _playbackSpeed = 1.0;
+
+  @override
+  void dispose() {
+    _playbackTimer?.cancel();
+    super.dispose();
+  }
+
+  void _resetPlayback() {
+    _playbackTimer?.cancel();
+    _playbackTimer = null;
+    _playing = false;
+    _playback = null;
+  }
+
+  void _startPlayback(List<Vehicle> points) {
+    _playbackTimer?.cancel();
+    _playback ??= TripPlayback(points: points);
+    _playback!.speedMultiplier = _playbackSpeed;
+    setState(() => _playing = true);
+    _playbackTimer = Timer.periodic(_playback!.stepDuration, (_) {
+      if (!mounted) return;
+      final playback = _playback;
+      if (playback == null) return;
+      if (playback.isAtEnd) {
+        _pausePlayback();
+        return;
+      }
+      setState(playback.advance);
+    });
+  }
+
+  void _pausePlayback() {
+    _playbackTimer?.cancel();
+    _playbackTimer = null;
+    if (mounted) setState(() => _playing = false);
+  }
+
+  void _setPlaybackSpeed(double speed) {
+    _playbackSpeed = speed;
+    final playback = _playback;
+    if (playback != null) playback.speedMultiplier = speed;
+    // A running timer restarts at the new pace.
+    if (_playing && playback != null) {
+      _playbackTimer?.cancel();
+      _playbackTimer = Timer.periodic(playback.stepDuration, (_) {
+        if (!mounted) return;
+        if (playback.isAtEnd) {
+          _pausePlayback();
+          return;
+        }
+        setState(playback.advance);
+      });
+    } else {
+      setState(() {});
+    }
+  }
+
+  /// Shares a Google Maps link to the vehicle's live location.
+  Future<void> _shareLiveLocation() async {
+    final vehicle = widget.vehicle;
+    if (!vehicle.hasFix) return;
+    final url = liveLocationUrl(vehicle.latitude!, vehicle.longitude!);
+    await SharePlus.instance.share(
+      ShareParams(
+        text: AppLocalizations.of(
+          context,
+        ).shareLiveLocationText(vehicle.displayName, url),
+      ),
+    );
+  }
+
   Future<void> _loadHistory() async {
     setState(() {
       _loadingHistory = true;
@@ -132,6 +217,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
           .read(trackerProvider.notifier)
           .fetchHistoryFor(widget.vehicle, from: startOfDay, to: now);
       if (!mounted) return;
+      _resetPlayback();
       setState(() => _history = points);
     } on UnsupportedError catch (e) {
       if (!mounted) return;
@@ -346,6 +432,18 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
           // Live location preview — tap for the full map.
           if (vehicle.hasFix) ...[
             _LiveLocationMap(vehicle: vehicle),
+            const SizedBox(height: 12),
+            // Share live location (v1.5.0): a Google Maps link to the
+            // current fix. Only when there is a real, live fix.
+            if (vehicle.status != VehicleStatus.expired)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _shareLiveLocation,
+                  icon: const Icon(Icons.share_location_outlined),
+                  label: Text(l10n.shareLiveLocation),
+                ),
+              ),
             const SizedBox(height: 16),
           ],
           // Facts.
@@ -452,11 +550,23 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        l10n.historyNotSupported(providerName),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onTertiaryContainer,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.historyNotSupported(providerName),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onTertiaryContainer,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            l10n.tripPlaybackNotAvailable,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onTertiaryContainer,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -484,38 +594,23 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
               ),
               if (historyPoints.length >= 2) ...[
                 const SizedBox(height: 8),
-                SizedBox(
-                  height: 220,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: FlutterMap(
-                      options: MapOptions(
-                        initialCenter: LatLng(
-                          historyPoints.first.latitude!,
-                          historyPoints.first.longitude!,
-                        ),
-                        initialZoom: 12,
-                      ),
-                      children: [
-                        TileLayer(
-                          urlTemplate:
-                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: 'com.nuvish.unitrack',
-                        ),
-                        PolylineLayer(
-                          polylines: [
-                            Polyline(
-                              points: historyPoints
-                                  .map((v) => LatLng(v.latitude!, v.longitude!))
-                                  .toList(),
-                              color: theme.colorScheme.primary,
-                              strokeWidth: 5,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+                _TripPlaybackMap(
+                  points: historyPoints,
+                  playback: _playback,
+                ),
+                const SizedBox(height: 12),
+                _TripPlaybackControls(
+                  points: historyPoints,
+                  playback: _playback,
+                  playing: _playing,
+                  speed: _playbackSpeed,
+                  onPlay: () => _startPlayback(historyPoints),
+                  onPause: _pausePlayback,
+                  onSeek: (index) {
+                    _playback ??= TripPlayback(points: historyPoints);
+                    setState(() => _playback!.seek(index));
+                  },
+                  onSpeed: _setPlaybackSpeed,
                 ),
               ],
               const SizedBox(height: 8),
@@ -674,6 +769,198 @@ class _TodaysTripSection extends ConsumerWidget {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(AppLocalizations.of(context).reportShared)),
+    );
+  }
+}
+
+/// Today's route map with trip playback (v1.5.0).
+///
+/// Before playback starts the whole route is drawn in the primary
+/// colour. Once playback runs, the travelled part stays primary and
+/// the remaining part fades, with a marker on the current point.
+class _TripPlaybackMap extends StatelessWidget {
+  const _TripPlaybackMap({required this.points, required this.playback});
+
+  final List<Vehicle> points;
+  final TripPlayback? playback;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final current = playback?.current;
+    final travelled = playback == null
+        ? points
+        : playback!.travelled;
+    final remaining = playback == null
+        ? const <Vehicle>[]
+        : playback!.remaining;
+    return SizedBox(
+      height: 220,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: FlutterMap(
+          options: MapOptions(
+            initialCenter: LatLng(
+              points.first.latitude!,
+              points.first.longitude!,
+            ),
+            initialZoom: 12,
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.nuvish.unitrack',
+            ),
+            PolylineLayer(
+              polylines: [
+                if (travelled.length >= 2)
+                  Polyline(
+                    points: travelled
+                        .map((v) => LatLng(v.latitude!, v.longitude!))
+                        .toList(),
+                    color: theme.colorScheme.primary,
+                    strokeWidth: 5,
+                  ),
+                if (remaining.length >= 2)
+                  Polyline(
+                    points: remaining
+                        .map((v) => LatLng(v.latitude!, v.longitude!))
+                        .toList(),
+                    color: theme.colorScheme.primary.withValues(alpha: 0.25),
+                    strokeWidth: 5,
+                  ),
+              ],
+            ),
+            if (current != null && current.hasFix)
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: LatLng(current.latitude!, current.longitude!),
+                    width: 44,
+                    height: 44,
+                    child: Icon(
+                      Icons.location_on,
+                      color: theme.colorScheme.primary,
+                      size: 40,
+                    ),
+                  ),
+                ],
+              ),
+            // ODbL attribution (v1.5.0).
+            const OsmAttribution(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Play / pause, scrub slider, current time + speed, and 1x/2x/4x
+/// speed control for trip playback (v1.5.0).
+class _TripPlaybackControls extends StatelessWidget {
+  const _TripPlaybackControls({
+    required this.points,
+    required this.playback,
+    required this.playing,
+    required this.speed,
+    required this.onPlay,
+    required this.onPause,
+    required this.onSeek,
+    required this.onSpeed,
+  });
+
+  final List<Vehicle> points;
+  final TripPlayback? playback;
+  final bool playing;
+  final double speed;
+  final VoidCallback onPlay;
+  final VoidCallback onPause;
+  final ValueChanged<int> onSeek;
+  final ValueChanged<double> onSpeed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    final index = playback?.index ?? 0;
+    final current = playback?.current;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                IconButton.filled(
+                  onPressed: playing ? onPause : onPlay,
+                  icon: Icon(playing ? Icons.pause : Icons.play_arrow),
+                  tooltip: playing ? l10n.pauseTrip : l10n.playTrip,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.tripPlayback,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      Text(
+                        l10n.playbackPoint(index + 1, points.length),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                if (current != null)
+                  Text(
+                    l10n.speedLabel(current),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+              ],
+            ),
+            Slider(
+              value: index.toDouble(),
+              max: (points.length - 1).toDouble(),
+              divisions: points.length - 1,
+              label: l10n.playbackPoint(index + 1, points.length),
+              onChanged: (value) => onSeek(value.round()),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    current == null
+                        ? ''
+                        : l10n.lastUpdatedLabel(current),
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+                SegmentedButton<double>(
+                  segments: TripPlayback.speeds
+                      .map(
+                        (s) => ButtonSegment(
+                          value: s,
+                          label: Text('${s.toStringAsFixed(0)}x'),
+                        ),
+                      )
+                      .toList(),
+                  selected: {speed},
+                  onSelectionChanged: (selected) =>
+                      onSpeed(selected.first),
+                  showSelectedIcon: false,
+                  style: SegmentedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -28,6 +28,21 @@ class VehicleCategoryIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final image = category.imageAsset;
+    if (image != null) {
+      // 3D image (v1.5.0): the image fills its own rounded tile, so
+      // the tinted tile colour is ignored for these categories.
+      final side = tileColor == null ? size : size + 20;
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(tileColor == null ? 6 : 12),
+        child: Image.asset(
+          image,
+          width: side,
+          height: side,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
     final icon = Icon(category.icon, size: size, color: color);
     final tile = tileColor;
     if (tile == null) return icon;

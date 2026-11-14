@@ -1,25 +1,40 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:latlong2/latlong.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/vehicle.dart';
+import '../providers/maps_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/tracker_provider.dart';
+import '../services/google_maps_key_channel.dart';
+import '../services/map_mode.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
+import '../widgets/osm_attribution.dart';
 import '../widgets/vehicle_category_icon.dart';
 import '../widgets/vehicle_status_chip.dart';
 import 'add_vehicle_screen.dart';
 import 'vehicle_detail_screen.dart';
 
-/// Map view: all vehicles with a fix, on OpenStreetMap tiles
-/// (flutter_map — no Google Maps API key needed).
+/// Map view: all vehicles with a fix.
+///
+/// Two map engines (v1.5.0): OpenStreetMap (flutter_map, the
+/// default — no key needed) and Google Maps (google_maps_flutter,
+/// used only when the user has saved their own API key in Settings).
+/// The user can switch between them with the toggle under the count
+/// chip whenever a key is saved; without a key the map is always
+/// OpenStreetMap.
 ///
 /// Markers carry the vehicle's reg no on a status-coloured pin with
-/// the vehicle-type icon inside; tapping one opens a bottom sheet
-/// with the key facts and a link to details.
+/// the vehicle-type icon inside (OSM) or a status-hued marker with
+/// an info window (Google); tapping one opens a bottom sheet with
+/// the key facts and a link to details.
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
@@ -29,13 +44,64 @@ class MapScreen extends ConsumerStatefulWidget {
 
 class _MapScreenState extends ConsumerState<MapScreen> {
   final _mapController = MapController();
+  gmaps.GoogleMapController? _googleController;
+
+  /// True once the saved Google Maps key has been applied to the
+  /// native SDK in this process (see [GoogleMapsKeyChannel]).
+  bool _googleReady = false;
+  String? _googleReadyForKey;
 
   static const _fallbackCenter = LatLng(10.8505, 76.2711); // Kerala
 
   @override
   void dispose() {
     _mapController.dispose();
+    _googleController?.dispose();
     super.dispose();
+  }
+
+  /// Applies the saved key to the native SDK, then flips [_googleReady]
+  /// so the GoogleMap widget can build. Until then the map tab shows
+  /// a loading state instead of a key-less (blank) Google map.
+  void _ensureGoogleReady(String key) {
+    if (_googleReadyForKey == key) return;
+    _googleReadyForKey = key;
+    _googleReady = false;
+    unawaited(
+      GoogleMapsKeyChannel().ensureApplied(key).then((ok) {
+        if (!mounted) return;
+        setState(() => _googleReady = ok);
+      }),
+    );
+  }
+
+  /// Marker hue matching the app's status colours: live emerald
+  /// (~160), idle amber (~38), unknown/expired slate (~213).
+  double _googleHue(VehicleStatus status) => switch (status) {
+    VehicleStatus.live => 160,
+    VehicleStatus.idle => 38,
+    VehicleStatus.unknown || VehicleStatus.expired => 213,
+  };
+
+  Set<gmaps.Marker> _googleMarkers(List<Vehicle> withFix) {
+    final l10n = AppLocalizations.of(context);
+    return withFix.map((vehicle) {
+      return gmaps.Marker(
+        markerId: gmaps.MarkerId('${vehicle.providerKey}:${vehicle.id}'),
+        position: gmaps.LatLng(vehicle.latitude!, vehicle.longitude!),
+        icon: gmaps.BitmapDescriptor.defaultMarkerWithHue(
+          _googleHue(vehicle.status),
+        ),
+        infoWindow: gmaps.InfoWindow(
+          title: vehicle.displayName,
+          snippet:
+              '${l10n.speedLabel(vehicle)} · '
+              '${l10n.statusLabel(vehicle.status)}',
+          onTap: () => _showVehicleSheet(vehicle),
+        ),
+        onTap: () => _showVehicleSheet(vehicle),
+      );
+    }).toSet();
   }
 
   void _openDetail(Vehicle vehicle) {
@@ -154,6 +220,29 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       label: Text(l10n.viewDetails),
                     ),
                   ),
+                  // Share live location (v1.5.0).
+                  if (vehicle.hasFix &&
+                      vehicle.status != VehicleStatus.expired) ...[
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final url = liveLocationUrl(
+                          vehicle.latitude!,
+                          vehicle.longitude!,
+                        );
+                        await SharePlus.instance.share(
+                          ShareParams(
+                            text: l10n.shareLiveLocationText(
+                              vehicle.displayName,
+                              url,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.share_location_outlined),
+                      label: Text(l10n.shareLiveLocationShort),
+                    ),
+                  ],
                   const SizedBox(width: 12),
                   OutlinedButton(
                     onPressed: () => Navigator.of(context).pop(),
@@ -168,7 +257,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
-  void _fitAll(List<Vehicle> withFix) {
+  void _fitAll(List<Vehicle> withFix, MapType mapType) {
+    if (mapType == MapType.googleMaps) {
+      _fitAllGoogle(withFix);
+    } else {
+      _fitAllOsm(withFix);
+    }
+  }
+
+  void _fitAllOsm(List<Vehicle> withFix) {
     if (withFix.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -192,12 +289,71 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
-  void _recenter(List<Vehicle> withFix) {
+  Future<void> _fitAllGoogle(List<Vehicle> withFix) async {
+    final controller = _googleController;
+    if (withFix.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).noVehiclesWithLocation),
+        ),
+      );
+      return;
+    }
+    if (controller == null) return;
+    if (withFix.length == 1) {
+      await controller.animateCamera(
+        gmaps.CameraUpdate.newLatLngZoom(
+          gmaps.LatLng(withFix.first.latitude!, withFix.first.longitude!),
+          14,
+        ),
+      );
+      return;
+    }
+    try {
+      await controller.animateCamera(
+        gmaps.CameraUpdate.newLatLngBounds(
+          gmaps.LatLngBounds(
+            southwest: gmaps.LatLng(
+              withFix.map((v) => v.latitude!).reduce((a, b) => a < b ? a : b),
+              withFix.map((v) => v.longitude!).reduce((a, b) => a < b ? a : b),
+            ),
+            northeast: gmaps.LatLng(
+              withFix.map((v) => v.latitude!).reduce((a, b) => a > b ? a : b),
+              withFix.map((v) => v.longitude!).reduce((a, b) => a > b ? a : b),
+            ),
+          ),
+          56,
+        ),
+      );
+    } catch (_) {
+      // newLatLngBounds needs a laid-out map; fall back to the first
+      // vehicle if the map has no size yet.
+      await controller.animateCamera(
+        gmaps.CameraUpdate.newLatLngZoom(
+          gmaps.LatLng(withFix.first.latitude!, withFix.first.longitude!),
+          11,
+        ),
+      );
+    }
+  }
+
+  void _recenter(List<Vehicle> withFix, MapType mapType) {
     if (withFix.isEmpty) return;
     final live = withFix.firstWhere(
       (v) => v.status == VehicleStatus.live,
       orElse: () => withFix.first,
     );
+    if (mapType == MapType.googleMaps) {
+      unawaited(
+        _googleController?.animateCamera(
+          gmaps.CameraUpdate.newLatLngZoom(
+            gmaps.LatLng(live.latitude!, live.longitude!),
+            13,
+          ),
+        ),
+      );
+      return;
+    }
     _mapController.move(LatLng(live.latitude!, live.longitude!), 13);
   }
 
@@ -212,6 +368,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
     final vehicles = ref.watch(trackerProvider.select((s) => s.vehicles));
+    // Map engine (v1.5.0): Google Maps only when the user saved their
+    // own API key; otherwise OpenStreetMap. The toggle below lets a
+    // key holder switch back to OpenStreetMap at any time.
+    final googleKey = ref.watch(googleMapsKeyProvider);
+    final hasGoogleKey = googleKey != null && googleKey.isNotEmpty;
+    final userMapType = ref.watch(mapTypeProvider);
+    final mapType = selectMapType(
+      hasGoogleMapsKey: hasGoogleKey,
+      userChoice: userMapType,
+    );
+    if (mapType == MapType.googleMaps && hasGoogleKey) {
+      _ensureGoogleReady(googleKey);
+    }
     // Cross-tab focus: a fleet card's "Map" action asks for a
     // vehicle; centre on it once, then clear the request. If the
     // vehicle is not in the fleet yet, the request stays pending
@@ -220,10 +389,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       if (key == null) return;
       final match = vehicles.where((v) => '${v.providerKey}:${v.id}' == key);
       if (match.isEmpty || !match.first.hasFix) return;
-      _mapController.move(
-        LatLng(match.first.latitude!, match.first.longitude!),
-        14,
-      );
+      if (mapType == MapType.googleMaps) {
+        unawaited(
+          _googleController?.animateCamera(
+            gmaps.CameraUpdate.newLatLngZoom(
+              gmaps.LatLng(match.first.latitude!, match.first.longitude!),
+              14,
+            ),
+          ),
+        );
+      } else {
+        _mapController.move(
+          LatLng(match.first.latitude!, match.first.longitude!),
+          14,
+        );
+      }
       ref.read(homeNavProvider.notifier).clearMapFocus();
     });
     final withFix = vehicles.where((v) => v.hasFix).toList();
@@ -236,92 +416,125 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final idleCount = vehicles
         .where((v) => v.status == VehicleStatus.idle)
         .length;
+    final showGoogleMap = mapType == MapType.googleMaps && _googleReady;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.navMap)),
       body: Stack(
         children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: center,
-              initialZoom: withFix.isNotEmpty ? 11 : 6,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.nuvish.unitrack',
+          if (showGoogleMap)
+            gmaps.GoogleMap(
+              initialCameraPosition: gmaps.CameraPosition(
+                target: gmaps.LatLng(center.latitude, center.longitude),
+                zoom: withFix.isNotEmpty ? 11 : 6,
               ),
-              MarkerLayer(
-                markers: withFix.map((vehicle) {
-                  return Marker(
-                    point: LatLng(vehicle.latitude!, vehicle.longitude!),
-                    width: 120,
-                    height: 72,
-                    child: GestureDetector(
-                      onTap: () => _showVehicleSheet(vehicle),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
+              markers: _googleMarkers(withFix),
+              onMapCreated: (controller) => _googleController = controller,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+            )
+          else if (mapType == MapType.googleMaps)
+            // Key saved but not yet applied to the native SDK: brief
+            // loading state instead of a key-less (blank) Google map.
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 12),
+                  Text(l10n.loadingGoogleMap),
+                ],
+              ),
+            )
+          else
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: center,
+                initialZoom: withFix.isNotEmpty ? 11 : 6,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate:
+                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.nuvish.unitrack',
+                ),
+                MarkerLayer(
+                  markers: withFix.map((vehicle) {
+                    return Marker(
+                      point: LatLng(vehicle.latitude!, vehicle.longitude!),
+                      width: 120,
+                      height: 72,
+                      child: GestureDetector(
+                        onTap: () => _showVehicleSheet(vehicle),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surface,
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: AppColors.statusColor(vehicle.status),
+                                  width: 2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.25),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                vehicle.displayName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTheme.mono(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surface,
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
                                 color: AppColors.statusColor(vehicle.status),
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.25),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
                                 ),
-                              ],
-                            ),
-                            child: Text(
-                              vehicle.displayName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTheme.mono(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.25),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                vehicle.category.icon,
+                                color: Colors.white,
+                                size: 22,
                               ),
                             ),
-                          ),
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: AppColors.statusColor(vehicle.status),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.25),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              vehicle.category.icon,
-                              color: Colors.white,
-                              size: 22,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
+                    );
+                  }).toList(),
+                ),
+                // ODbL attribution (v1.5.0) — required on every
+                // OpenStreetMap view. Google Maps draws its own.
+                const OsmAttribution(),
+              ],
+            ),
           // Live count chip: a surfaceContainerHigh pill, as in the
           // prototype. The label truncates instead of overflowing
           // on narrow screens / large system fonts.
@@ -371,6 +584,40 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
             ),
           ),
+          // Map-type toggle (v1.5.0): only when a Google Maps key is
+          // saved. Lets the user switch back to OpenStreetMap at any
+          // time — e.g. when Google Maps shows an error for a bad key.
+          if (hasGoogleKey)
+            Positioned(
+              top: 68,
+              left: 16,
+              right: 16,
+              child: Center(
+                child: SegmentedButton<MapType>(
+                  segments: [
+                    ButtonSegment(
+                      value: MapType.openStreetMap,
+                      icon: const Icon(Icons.map_outlined, size: 18),
+                      label: Text(l10n.mapTypeOsm),
+                    ),
+                    ButtonSegment(
+                      value: MapType.googleMaps,
+                      icon: const Icon(Icons.map, size: 18),
+                      label: Text(l10n.mapTypeGoogle),
+                    ),
+                  ],
+                  selected: {mapType},
+                  onSelectionChanged: (selected) {
+                    ref
+                        .read(mapTypeProvider.notifier)
+                        .setMapType(selected.first);
+                  },
+                  style: SegmentedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.surfaceContainerHigh,
+                  ),
+                ),
+              ),
+            ),
           // Fit-all + recenter buttons: tonal, as in the prototype —
           // Fit all is secondaryContainer, Recenter is
           // surfaceContainerHigh with an outline border.
@@ -381,7 +628,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               children: [
                 FloatingActionButton.small(
                   heroTag: 'fit_all',
-                  onPressed: () => _fitAll(withFix),
+                  onPressed: () => _fitAll(withFix, mapType),
                   tooltip: l10n.fitAllVehicles,
                   backgroundColor: theme.colorScheme.secondaryContainer,
                   foregroundColor: theme.colorScheme.onSecondaryContainer,
@@ -390,7 +637,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 const SizedBox(height: 12),
                 FloatingActionButton.small(
                   heroTag: 'recenter',
-                  onPressed: () => _recenter(withFix),
+                  onPressed: () => _recenter(withFix, mapType),
                   tooltip: l10n.centreOnLive,
                   backgroundColor: theme.colorScheme.surfaceContainerHigh,
                   foregroundColor: theme.colorScheme.onSurface,

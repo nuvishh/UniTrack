@@ -395,6 +395,25 @@ class AppLocalizations {
   String get mapEmptyMessage2 => t('mapEmptyMessage2');
   String get noLocationsYet => t('noLocationsYet');
 
+  // ---- Map type + Google Maps (v1.5.0) ----
+  String get mapTypeOsm => t('mapTypeOsm');
+  String get mapTypeGoogle => t('mapTypeGoogle');
+  String get loadingGoogleMap => t('loadingGoogleMap');
+  String get shareLiveLocation => t('shareLiveLocation');
+  String get shareLiveLocationShort => t('shareLiveLocationShort');
+
+  String shareLiveLocationText(String name, String url) =>
+      tp('shareLiveLocationText', {'name': name, 'url': url});
+
+  // ---- Trip playback (v1.5.0) ----
+  String get playTrip => t('playTrip');
+  String get pauseTrip => t('pauseTrip');
+  String get tripPlayback => t('tripPlayback');
+  String get tripPlaybackNotAvailable => t('tripPlaybackNotAvailable');
+
+  String playbackPoint(int index, int total) =>
+      tp('playbackPoint', {'index': '$index', 'total': '$total'});
+
   String mapCountLabel(int liveCount, int idleCount, int total) => tp(
     'mapCountLabel',
     {'live': '$liveCount', 'idle': '$idleCount', 'total': '$total'},
@@ -412,6 +431,18 @@ class AppLocalizations {
   String get exportKeysTitle => t('exportKeysTitle');
   String get exportAnyway => t('exportAnyway');
   String get couldNotReadFile => t('couldNotReadFile');
+
+  // ---- Google Maps key (v1.5.0) ----
+  String get mapSettings => t('mapSettings');
+  String get googleMapsApiKey => t('googleMapsApiKey');
+  String get googleMapsApiKeyHint => t('googleMapsApiKeyHint');
+  String get googleMapsApiKeyHelp => t('googleMapsApiKeyHelp');
+  String get googleMapsKeySaved => t('googleMapsKeySaved');
+  String get googleMapsKeyRemoved => t('googleMapsKeyRemoved');
+  String get googleMapsKeyApplyFailed => t('googleMapsKeyApplyFailed');
+  String get googleMapsRestartNote => t('googleMapsRestartNote');
+  String get saveKey => t('saveKey');
+  String get clearKey => t('clearKey');
   String get couldNotReadBackup => t('couldNotReadBackup');
   String get backupNoVehicles => t('backupNoVehicles');
   String get noVehiclesSavedMessage => t('noVehiclesSavedMessage');
@@ -742,6 +773,20 @@ const Map<String, Map<String, String>> _strings = {
     'mapEmptyTitle2': 'No vehicles on the map yet',
     'mapEmptyMessage2': 'Add a vehicle and its live location will appear here.',
     'noLocationsYet': 'No locations to show yet — the providers have not returned a fix for these vehicles.',
+    // v1.5.0: map type + Google Maps.
+    'mapTypeOsm': 'OpenStreetMap',
+    'mapTypeGoogle': 'Google Maps',
+    'loadingGoogleMap': 'Loading Google Maps…',
+    'shareLiveLocation': 'Share live location',
+    'shareLiveLocationShort': 'Share',
+    'shareLiveLocationText': '{name} — live location: {url}',
+    // v1.5.0: trip playback.
+    'playTrip': 'Play trip',
+    'pauseTrip': 'Pause trip',
+    'tripPlayback': 'Trip playback',
+    'tripPlaybackNotAvailable':
+        'Trip playback is not available for this provider — it does not share trip history.',
+    'playbackPoint': 'Point {index} of {total}',
     'settingsSubtitle': 'Material You theme, polling intervals & providers',
     'themeAppliesNote': 'Applies immediately, in both light and dark mode.',
     'backupCardText': 'Reinstalling the app wipes saved vehicles and credentials. Export a backup first, then import it after reinstalling.',
@@ -756,6 +801,20 @@ const Map<String, Map<String, String>> _strings = {
     'exportKeysContentMany': 'This backup file contains your API keys and passwords in plain text — {n} vehicles. Anyone with the file can track your vehicles.\n\nKeep it private: store it somewhere safe and never send it to anyone.',
     'exportAnyway': 'Export anyway',
     'couldNotReadFile': 'Could not read that file.',
+    // v1.5.0: Google Maps API key.
+    'mapSettings': 'Map',
+    'googleMapsApiKey': 'Google Maps API key',
+    'googleMapsApiKeyHint': 'Paste your Google Maps API key',
+    'googleMapsApiKeyHelp':
+        'With a key, the Map tab shows Google Maps; without one it stays on OpenStreetMap. The key needs “Maps SDK for Android” (and iOS) enabled in Google Cloud Console, with billing enabled. Restrict the key in Google Cloud Console to this app (Android app restriction: package name com.nuvish.unitrack + SHA-1) so nobody else can use it. If Google Maps shows an error, switch back to OpenStreetMap from the Map tab.',
+    'googleMapsKeySaved': 'Google Maps key saved.',
+    'googleMapsKeyRemoved': 'Google Maps key removed.',
+    'googleMapsKeyApplyFailed':
+        'Could not apply that key — check it and try again. The map stays on OpenStreetMap.',
+    'googleMapsRestartNote':
+        'Restart the app for the new key to take effect.',
+    'saveKey': 'Save key',
+    'clearKey': 'Clear key',
     'couldNotReadBackup': 'Could not read this backup file.',
     'backupNoVehicles': 'This backup has no vehicles to import.',
     'backupNothingNewOne': 'Nothing new — all {n} vehicle is already saved.',
@@ -1060,6 +1119,20 @@ const Map<String, Map<String, String>> _strings = {
     'mapEmptyMessage2':
         'ഒരു വാഹനം ചേർക്കുക, അതിന്റെ ലൈവ് ലൊക്കേഷൻ ഇവിടെ കാണിക്കും.',
     'noLocationsYet': 'ഇതുവരെ കാണിക്കാൻ ലൊക്കേഷനുകളില്ല — പ്രൊവൈഡർമാർ ഈ വാഹനങ്ങൾക്ക് ഫിക്സ് നൽകിയിട്ടില്ല.',
+    // v1.5.0: map type + Google Maps.
+    'mapTypeOsm': 'OpenStreetMap',
+    'mapTypeGoogle': 'Google Maps',
+    'loadingGoogleMap': 'Google Maps ലോഡ് ചെയ്യുന്നു…',
+    'shareLiveLocation': 'ലൈവ് ലൊക്കേഷൻ പങ്കിടുക',
+    'shareLiveLocationShort': 'പങ്കിടുക',
+    'shareLiveLocationText': '{name} — ലൈവ് ലൊക്കേഷൻ: {url}',
+    // v1.5.0: trip playback.
+    'playTrip': 'യാത്ര പ്ലേ ചെയ്യുക',
+    'pauseTrip': 'യാത്ര താൽക്കാലികമായി നിർത്തുക',
+    'tripPlayback': 'യാത്ര പ്ലേബാക്ക്',
+    'tripPlaybackNotAvailable':
+        'ഈ പ്രൊവൈഡറിന് യാത്ര പ്ലേബാക്ക് ലഭ്യമല്ല — ഇത് യാത്രാ ചരിത്രം പങ്കിടുന്നില്ല.',
+    'playbackPoint': '{total} ൽ {index}-ആം പോയിന്റ്',
     'settingsSubtitle': 'മെറ്റീരിയൽ യൂ തീം, പോളിങ് ഇടവേളകൾ & പ്രൊവൈഡറുകൾ',
     'themeAppliesNote': 'ലൈറ്റ്, ഡാർക്ക് മോഡുകളിൽ ഉടൻ പ്രാബല്യത്തിൽ വരും.',
     'backupCardText': 'ആപ്പ് വീണ്ടും ഇൻസ്റ്റാൾ ചെയ്യുമ്പോൾ സംരക്ഷിച്ച വാഹനങ്ങളും ക്രെഡൻഷ്യലുകളും മാഞ്ഞുപോകും. ആദ്യം ഒരു ബാക്കപ്പ് എക്സ്പോർട്ട് ചെയ്യുക, വീണ്ടും ഇൻസ്റ്റാൾ ചെയ്ത ശേഷം ഇംപോർട്ട് ചെയ്യുക.',
@@ -1075,6 +1148,20 @@ const Map<String, Map<String, String>> _strings = {
     'exportKeysContentMany': 'ഈ ബാക്കപ്പ് ഫയലിൽ നിങ്ങളുടെ API കീകളും പാസ്‌വേഡുകളും പ്ലെയിൻ ടെക്സ്റ്റായി ഉണ്ട് — {n} വാഹനങ്ങൾ. ഫയൽ കൈവശമുള്ള ആർക്കും നിങ്ങളുടെ വാഹനങ്ങൾ ട്രാക്ക് ചെയ്യാം.\n\nസ്വകാര്യമായി സൂക്ഷിക്കുക: സുരക്ഷിതമായ ഒരിടത്ത് വയ്ക്കുക, ആർക്കും അയയ്ക്കരുത്.',
     'exportAnyway': 'എന്തായാലും എക്സ്പോർട്ട് ചെയ്യുക',
     'couldNotReadFile': 'ആ ഫയൽ വായിക്കാനായില്ല.',
+    // v1.5.0: Google Maps API key.
+    'mapSettings': 'മാപ്പ്',
+    'googleMapsApiKey': 'Google Maps API കീ',
+    'googleMapsApiKeyHint': 'നിങ്ങളുടെ Google Maps API കീ ഒട്ടിക്കുക',
+    'googleMapsApiKeyHelp':
+        'കീ ഉണ്ടെങ്കിൽ മാപ്പ് ടാബിൽ Google Maps കാണിക്കും; ഇല്ലെങ്കിൽ OpenStreetMap തന്നെ തുടരും. കീക്ക് Google Cloud Console-ൽ “Maps SDK for Android” (ഒപ്പം iOS) പ്രവർത്തനക്ഷമമാക്കുകയും ബില്ലിങ് ഓണാക്കുകയും വേണം. മറ്റാർക്കും ഉപയോഗിക്കാനാകാത്ത വിധം കീ Google Cloud Console-ൽ ഈ ആപ്പിലേക്ക് മാത്രമായി പരിമിതപ്പെടുത്തുക (Android ആപ്പ് നിയന്ത്രണം: package name com.nuvish.unitrack + SHA-1). Google Maps പിശക് കാണിച്ചാൽ മാപ്പ് ടാബിൽ നിന്ന് OpenStreetMap-ലേക്ക് മടങ്ങുക.',
+    'googleMapsKeySaved': 'Google Maps കീ സംരക്ഷിച്ചു.',
+    'googleMapsKeyRemoved': 'Google Maps കീ നീക്കം ചെയ്തു.',
+    'googleMapsKeyApplyFailed':
+        'ആ കീ പ്രയോഗിക്കാനായില്ല — പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക. മാപ്പ് OpenStreetMap-ൽ തന്നെ തുടരും.',
+    'googleMapsRestartNote':
+        'പുതിയ കീ പ്രാബല്യത്തിൽ വരാൻ ആപ്പ് വീണ്ടും തുറക്കുക.',
+    'saveKey': 'കീ സംരക്ഷിക്കുക',
+    'clearKey': 'കീ മായ്ക്കുക',
     'couldNotReadBackup': 'ഈ ബാക്കപ്പ് ഫയൽ വായിക്കാനായില്ല.',
     'backupNoVehicles': 'ഈ ബാക്കപ്പിൽ ഇംപോർട്ട് ചെയ്യാൻ വാഹനങ്ങളില്ല.',
     'backupNothingNewOne':

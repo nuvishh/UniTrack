@@ -1,0 +1,16 @@
+# Splash screen (v1.5.0): matches the new launcher icon — the same
+# logo on the same deep violet-navy background (#1F0754, sampled
+# from the logo image) so the logo blends seamlessly. The image is
+# the transparent-corner version of the logo: the white corners of
+# the source art are transparent, so no white triangles show around
+# the logo on the violet background.
+flutter_native_splash:
+  color: "#1F0754"
+  image: assets/icon/app_icon_transparent.png
+  color_dark: "#1F0754"
+  image_dark: assets/icon/app_icon_transparent.png
+
+  android_12:
+    color: "#1F0754"
+    image: assets/icon/app_icon_transparent.png
+    icon_background_color: "#1F0754"

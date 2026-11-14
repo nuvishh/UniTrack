@@ -553,7 +553,10 @@ class _FleetListScreenState extends ConsumerState<FleetListScreen> {
                                 categoryCounts[category]!,
                               ),
                               selected: _selectedCategory == category,
-                              icon: category.icon,
+                              leading: VehicleCategoryIcon(
+                                category: category,
+                                size: 22,
+                              ),
                               onTap: () => applyCategory(category),
                             ),
                           ),
@@ -802,21 +805,23 @@ class _SummaryStrip extends StatelessWidget {
 /// One pill filter chip (shared by the compact status bar and the
 /// Filters sheet): secondaryContainer + onSecondaryContainer when
 /// selected, surfaceContainerLow + outlineVariant border when not.
-/// An optional leading [icon] (category chips) or a check mark when
-/// [showCheck] and selected (provider chips).
+/// An optional leading widget (3D category image) or a check mark
+/// when [showCheck] and selected (provider chips).
 class _FilterChip extends StatelessWidget {
   const _FilterChip({
     required this.label,
     required this.selected,
     required this.onTap,
-    this.icon,
+    this.leading,
     this.showCheck = false,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  final IconData? icon;
+
+  /// Custom leading widget (e.g. a 3D category image).
+  final Widget? leading;
   final bool showCheck;
 
   @override
@@ -847,8 +852,8 @@ class _FilterChip extends StatelessWidget {
               Icon(Icons.check, size: 16, color: foreground),
               const SizedBox(width: 4),
             ],
-            if (icon != null) ...[
-              Icon(icon, size: 18, color: foreground),
+            if (leading != null) ...[
+              leading!,
               const SizedBox(width: 6),
             ],
             Text(

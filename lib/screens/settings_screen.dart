@@ -10,6 +10,7 @@ import '../l10n/app_localizations.dart';
 import '../models/saved_vehicle.dart';
 import '../models/theme_seed.dart';
 import '../providers/locale_provider.dart';
+import '../providers/maps_provider.dart';
 import '../providers/notification_provider.dart';
 import '../providers/registry_provider.dart';
 import '../providers/saved_vehicles_provider.dart';
@@ -439,6 +440,9 @@ class SettingsScreen extends ConsumerWidget {
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 24),
+          SectionHeader(title: l10n.mapSettings),
+          const _GoogleMapsKeyCard(),
+          const SizedBox(height: 24),
           SectionHeader(title: l10n.backupRestore),
           Card(
             child: Padding(
@@ -640,17 +644,15 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(
-                          Icons.location_on,
-                          color: theme.colorScheme.onPrimaryContainer,
-                          size: 28,
+                      // The new launcher icon (v1.5.0) instead of the
+                      // generic pin.
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.asset(
+                          'assets/icon/app_icon.png',
+                          width: 52,
+                          height: 52,
+                          fit: BoxFit.cover,
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -660,7 +662,7 @@ class SettingsScreen extends ConsumerWidget {
                           children: [
                             Text('UniTrack', style: theme.textTheme.titleLarge),
                             Text(
-                              l10n.versionLabel('1.4.0 (build 16)'),
+                              l10n.versionLabel('1.5.0 (build 17)'),
                               style: theme.textTheme.bodySmall,
                             ),
                           ],
@@ -690,6 +692,147 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// "Google Maps API key" card (v1.5.0): the user pastes their own
+/// key, saved in secure storage like the provider secrets. With a
+/// key the Map tab shows Google Maps; without one it stays on
+/// OpenStreetMap.
+class _GoogleMapsKeyCard extends ConsumerStatefulWidget {
+  const _GoogleMapsKeyCard();
+
+  @override
+  ConsumerState<_GoogleMapsKeyCard> createState() => _GoogleMapsKeyCardState();
+}
+
+class _GoogleMapsKeyCardState extends ConsumerState<_GoogleMapsKeyCard> {
+  final _controller = TextEditingController();
+  bool _obscured = true;
+  bool _showRestartNote = false;
+
+  /// True once the field has been filled from the saved key, so a
+  /// late storage load never overwrites what the user typed.
+  bool _synced = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final l10n = AppLocalizations.of(context);
+    final text = _controller.text.trim();
+    final applied = await ref
+        .read(googleMapsKeyProvider.notifier)
+        .setKey(text);
+    if (!mounted) return;
+    setState(() => _showRestartNote = text.isNotEmpty);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          text.isEmpty
+              ? l10n.googleMapsKeyRemoved
+              : applied
+              ? l10n.googleMapsKeySaved
+              : l10n.googleMapsKeyApplyFailed,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _clear() async {
+    final l10n = AppLocalizations.of(context);
+    _controller.clear();
+    await ref.read(googleMapsKeyProvider.notifier).clearKey();
+    if (!mounted) return;
+    setState(() => _showRestartNote = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.googleMapsKeyRemoved)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    final savedKey = ref.watch(googleMapsKeyProvider);
+    if (!_synced && savedKey != null) {
+      _controller.text = savedKey;
+      _synced = true;
+    }
+    final hasKey = savedKey != null && savedKey.isNotEmpty;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.googleMapsApiKey, style: theme.textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(l10n.googleMapsApiKeyHelp, style: theme.textTheme.bodySmall),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _controller,
+              obscureText: _obscured,
+              autocorrect: false,
+              enableSuggestions: false,
+              decoration: InputDecoration(
+                hintText: l10n.googleMapsApiKeyHint,
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscured
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
+                  tooltip: _obscured ? l10n.show : l10n.hide,
+                  onPressed: () => setState(() => _obscured = !_obscured),
+                ),
+              ),
+              onChanged: (_) => setState(() => _showRestartNote = false),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _save,
+                    icon: const Icon(Icons.key_outlined),
+                    label: Text(l10n.saveKey),
+                  ),
+                ),
+                if (hasKey) ...[
+                  const SizedBox(width: 10),
+                  OutlinedButton.icon(
+                    onPressed: _clear,
+                    icon: const Icon(Icons.delete_outline),
+                    label: Text(l10n.clearKey),
+                  ),
+                ],
+              ],
+            ),
+            if (_showRestartNote) ...[
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      l10n.googleMapsRestartNote,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

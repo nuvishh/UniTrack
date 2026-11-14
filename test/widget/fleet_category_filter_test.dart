@@ -120,10 +120,23 @@ void main() {
     expect(find.text('Bus (1)'), findsOneWidget);
     expect(find.text('Car (1)'), findsOneWidget);
     expect(find.text('Truck (1)'), findsOneWidget);
-    // Category icons show on the cards (and the chips).
-    expect(find.byIcon(Icons.directions_bus), findsWidgets);
-    expect(find.byIcon(Icons.directions_car), findsWidgets);
-    expect(find.byIcon(Icons.local_shipping), findsWidgets);
+    // Category 3D images show on the cards (and the chips, v1.5.0)
+    // instead of the old flat icons.
+    for (final asset in [
+      'assets/categories/bus.png',
+      'assets/categories/car.png',
+      'assets/categories/truck.png',
+    ]) {
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is Image &&
+              w.image is AssetImage &&
+              (w.image as AssetImage).assetName == asset,
+        ),
+        findsWidgets,
+      );
+    }
 
     await tester.tap(find.text('Bus (1)'));
     await tester.pump();
