@@ -101,6 +101,33 @@ class MercyDataTrack4GClient extends GpsProviderClient {
     }
   }
 
+  @override
+  Future<List<Vehicle>> fetchHistory(
+    ProviderCredentials credentials, {
+    required DateTime from,
+    required DateTime to,
+    http.Client? httpClient,
+  }) async {
+    final data = await MercyDataTrackClient.fetchTripData(
+      _base,
+      label: 'Mercydatrack (4G)',
+      deviceId: credentials.deviceId.trim(),
+      auth: MercyDataTrackClient.splitAuth(credentials),
+      httpClient: httpClient,
+    );
+    MercyDataTrackClient.verifyTripVehicle(
+      data,
+      credentials.deviceId.trim(),
+      'Mercydatrack (4G)',
+    );
+    return MercyDataTrackClient.parseTripPoints(
+      data,
+      provider.key,
+      from: from,
+      to: to,
+    );
+  }
+
   /// Parses one 4G vehicle-data object (date + registration + today's
   /// points). The live position is the latest point by time. Public
   /// for tests.

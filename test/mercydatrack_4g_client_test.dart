@@ -10,10 +10,9 @@ import 'package:unitrack/services/providers/provider_client_factory.dart';
 // All values below are FAKE examples — never real reg numbers, chassis
 // numbers, IMEIs, vehicle ids or keys.
 void main() {
-  group('MercyDataTrack4GClient.fetchLiveVehicles', () {
-    // Points deliberately NOT in newest-first order: the client must
-    // pick the latest point by time, not just the first element.
-    const body = '''
+  // Points deliberately NOT in newest-first order: the client must
+  // pick the latest point by time, not just the first element.
+  const body = '''
 {"status": "success", "code": 200, "data": {
   "date": "12-11-2026",
   "vehicle_registration": "FAKECHASSIS0000001",
@@ -24,10 +23,12 @@ void main() {
 }}
 ''';
 
-    const credentials = ProviderCredentials(
-      deviceId: 'FAKECHASSIS0000001',
-      secret: 'demo_user:demo_pass',
-    );
+  const credentials = ProviderCredentials(
+    deviceId: 'FAKECHASSIS0000001',
+    secret: 'demo_user:demo_pass',
+  );
+
+  group('MercyDataTrack4GClient.fetchLiveVehicles', () {
 
     test('returns the requested vehicle at its latest point', () async {
       final mock = MockClient((_) async => http.Response(body, 200));
@@ -101,6 +102,59 @@ void main() {
       expect(
         () => MercyDataTrack4GClient().fetchLiveVehicles(
           credentials,
+          httpClient: mock,
+        ),
+        throwsA(isA<ProviderException>()),
+      );
+    });
+  });
+
+  group('MercyDataTrack4GClient.fetchHistory', () {
+    test('returns today\'s points oldest-first', () async {
+      final mock = MockClient((_) async => http.Response(body, 200));
+      final points = await MercyDataTrack4GClient().fetchHistory(
+        credentials,
+        from: DateTime(2026, 11, 12, 16),
+        to: DateTime(2026, 11, 12, 17),
+        httpClient: mock,
+      );
+      expect(points, hasLength(2));
+      expect(points[0].lastUpdated, DateTime(2026, 11, 12, 16, 10, 18));
+      expect(points[0].latitude, 11.111111);
+      expect(points[0].ignition, isFalse);
+      expect(points[0].status, VehicleStatus.idle);
+      expect(points[0].providerKey, 'mercydatrack4g');
+      expect(points[1].lastUpdated, DateTime(2026, 11, 12, 16, 22, 18));
+      expect(points[1].latitude, 12.345678);
+      expect(points[1].speedKmph, 12.5);
+      expect(points[1].ignition, isTrue);
+      expect(points[1].status, VehicleStatus.live);
+    });
+
+    test('keeps only points inside the requested range', () async {
+      final mock = MockClient((_) async => http.Response(body, 200));
+      final points = await MercyDataTrack4GClient().fetchHistory(
+        credentials,
+        from: DateTime(2026, 11, 12, 16, 15),
+        to: DateTime(2026, 11, 12, 17),
+        httpClient: mock,
+      );
+      expect(points, hasLength(1));
+      expect(points[0].lastUpdated, DateTime(2026, 11, 12, 16, 22, 18));
+    });
+
+    test('a different registration in the response throws', () async {
+      final mock = MockClient(
+        (_) async => http.Response(
+          body.replaceAll('FAKECHASSIS0000001', 'FAKECHASSIS0000002'),
+          200,
+        ),
+      );
+      expect(
+        () => MercyDataTrack4GClient().fetchHistory(
+          credentials,
+          from: DateTime(2026, 11, 12, 16),
+          to: DateTime(2026, 11, 12, 17),
           httpClient: mock,
         ),
         throwsA(isA<ProviderException>()),

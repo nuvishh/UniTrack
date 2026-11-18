@@ -7,6 +7,7 @@ import '../../models/provider_credentials.dart';
 import '../../models/vehicle.dart';
 import '../../utils/parsing.dart';
 import 'gps_provider_client.dart';
+import 'mercydatrack_client.dart';
 
 /// PauldeaTrack client.
 ///
@@ -18,9 +19,15 @@ import 'gps_provider_client.dart';
 ///   the same endpoint but did not answer from the VM on 2026-11-11,
 ///   so the mobiles host is the one to use.)
 /// - GET /vehicle-live-data?username=...&password=...&vehicle_registration=...
-///   → {"status":"success","code":200,"data":{...}} — one vehicle object.
-/// - Data fields: vehicle_registration, imei_no, latitude, longitude,
-///   ignition ("ON"/"OFF"), speed, serial_no, source_date
+///   → {"status":"success","code":200,"data":{...}} — one vehicle object
+///   (live data).
+/// - GET /vehicle-data?username=...&password=...&vehicle_registration=...
+///   → {"status":"success","code":200,"data":{"date":"dd-MM-yyyy",
+///   "vehicle_registration":"...", "data":[{latitude, longitude,
+///   ignition, mainPower, sourceTime, speed}, ...]}} — today's track
+///   (trip history), points newest first.
+/// - Data fields (live): vehicle_registration, imei_no, latitude,
+///   longitude, ignition ("ON"/"OFF"), speed, serial_no, source_date
 ///   ("dd-MM-yyyy hh:mm:ss AM/PM", no timezone).
 /// - The vehicle_registration parameter selects one vehicle when the
 ///   account has several; the response carries that one vehicle only.
@@ -112,6 +119,33 @@ class PauldeaTrackClient extends GpsProviderClient {
     } finally {
       if (httpClient == null) client.close();
     }
+  }
+
+  @override
+  Future<List<Vehicle>> fetchHistory(
+    ProviderCredentials credentials, {
+    required DateTime from,
+    required DateTime to,
+    http.Client? httpClient,
+  }) async {
+    final data = await MercyDataTrackClient.fetchTripData(
+      _base,
+      label: 'PauldeaTrack',
+      deviceId: credentials.deviceId.trim(),
+      auth: splitAuth(credentials),
+      httpClient: httpClient,
+    );
+    MercyDataTrackClient.verifyTripVehicle(
+      data,
+      credentials.deviceId.trim(),
+      'PauldeaTrack',
+    );
+    return MercyDataTrackClient.parseTripPoints(
+      data,
+      provider.key,
+      from: from,
+      to: to,
+    );
   }
 
   /// Parses one vehicle-live-data object. Public for tests.

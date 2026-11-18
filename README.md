@@ -39,9 +39,9 @@ No account, no sign-up — install it and add your vehicles.
 | Aargee GPS | API key | Yes |
 | HashTrace | Auth key | No |
 | LiveTrace | User ID + key | No |
-| Mercydatrack | Username + password | No |
-| Mercydatrack 4G | Username + password | No |
-| PauldeaTrack | Username + password | No |
+| Mercydatrack | Username + password | Yes |
+| Mercydatrack 4G | Username + password | Yes |
+| PauldeaTrack | Username + password | Yes |
 | SimplyTrack | API key + user ID | Yes |
 | Transight GPS | API key | Yes |
 

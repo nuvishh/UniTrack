@@ -112,4 +112,74 @@ void main() {
       );
     });
   });
+
+  group('PauldeaTrackClient.fetchHistory', () {
+    // /vehicle-data returns TODAY's track, points newest first.
+    const tripBody = '''
+{"status": "success", "code": 200, "data": {
+  "date": "11-11-2026",
+  "vehicle_registration": "KL00XX0000",
+  "data": [
+    {"latitude": "012.345678", "longitude": "075.012345", "ignition": "ON", "mainPower": "connected", "sourceTime": "03:34:32 PM", "speed": "36.5"},
+    {"latitude": "011.111111", "longitude": "075.111111", "ignition": "OFF", "mainPower": "connected", "sourceTime": "03:10:18 PM", "speed": "0.0"}
+  ]
+}}
+''';
+
+    const credentials = ProviderCredentials(
+      deviceId: 'KL00XX0000',
+      secret: 'demo_user:demo_pass',
+    );
+
+    test('returns today\'s points oldest-first', () async {
+      final mock = MockClient((_) async => http.Response(tripBody, 200));
+      final points = await PauldeaTrackClient().fetchHistory(
+        credentials,
+        from: DateTime(2026, 11, 11, 15),
+        to: DateTime(2026, 11, 11, 16),
+        httpClient: mock,
+      );
+      expect(points, hasLength(2));
+      expect(points[0].lastUpdated, DateTime(2026, 11, 11, 15, 10, 18));
+      expect(points[0].latitude, 11.111111);
+      expect(points[0].ignition, isFalse);
+      expect(points[0].status, VehicleStatus.idle);
+      expect(points[0].providerKey, 'pauldeatrack');
+      expect(points[1].lastUpdated, DateTime(2026, 11, 11, 15, 34, 32));
+      expect(points[1].latitude, 12.345678);
+      expect(points[1].speedKmph, 36.5);
+      expect(points[1].ignition, isTrue);
+      expect(points[1].status, VehicleStatus.live);
+    });
+
+    test('keeps only points inside the requested range', () async {
+      final mock = MockClient((_) async => http.Response(tripBody, 200));
+      final points = await PauldeaTrackClient().fetchHistory(
+        credentials,
+        from: DateTime(2026, 11, 11, 15, 30),
+        to: DateTime(2026, 11, 11, 16),
+        httpClient: mock,
+      );
+      expect(points, hasLength(1));
+      expect(points[0].lastUpdated, DateTime(2026, 11, 11, 15, 34, 32));
+    });
+
+    test('a different registration in the response throws', () async {
+      final mock = MockClient(
+        (_) async => http.Response(
+          tripBody.replaceAll('KL00XX0000', 'KL00XX0001'),
+          200,
+        ),
+      );
+      expect(
+        () => PauldeaTrackClient().fetchHistory(
+          credentials,
+          from: DateTime(2026, 11, 11, 15),
+          to: DateTime(2026, 11, 11, 16),
+          httpClient: mock,
+        ),
+        throwsA(isA<ProviderException>()),
+      );
+    });
+  });
 }

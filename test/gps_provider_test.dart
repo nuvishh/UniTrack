@@ -33,21 +33,17 @@ void main() {
     });
 
     test('only live-snapshot providers lack history support', () {
-      // Live snapshots only: HashTrace, LiveTrace, Mercydatrack and
-      // PauldeaTrack (no history endpoint verified for the last two),
-      // plus Mercydatrack (4G), whose endpoint returns today's
-      // track but no server-side history API.
+      // Live snapshots only: HashTrace and LiveTrace. Mercydatrack
+      // (2G and 4G) and PauldeaTrack return today's track from their
+      // /vehicle-data endpoint, so they support history too.
       expect(GpsProvider.hashtrace.supportsHistory, isFalse);
       expect(GpsProvider.radiant.supportsHistory, isFalse);
-      expect(GpsProvider.mercydatrack.supportsHistory, isFalse);
-      expect(GpsProvider.mercydatrack4g.supportsHistory, isFalse);
-      expect(GpsProvider.pauldeatrack.supportsHistory, isFalse);
+      expect(GpsProvider.mercydatrack.supportsHistory, isTrue);
+      expect(GpsProvider.mercydatrack4g.supportsHistory, isTrue);
+      expect(GpsProvider.pauldeatrack.supportsHistory, isTrue);
       for (final provider in GpsProvider.values) {
         if (provider != GpsProvider.hashtrace &&
-            provider != GpsProvider.radiant &&
-            provider != GpsProvider.mercydatrack &&
-            provider != GpsProvider.mercydatrack4g &&
-            provider != GpsProvider.pauldeatrack) {
+            provider != GpsProvider.radiant) {
           expect(
             provider.supportsHistory,
             isTrue,
