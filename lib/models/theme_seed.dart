@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// One M3 tonal palette: the full light + dark colour set for a seed.
 ///
