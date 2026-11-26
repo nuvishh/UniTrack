@@ -16,8 +16,8 @@ No account, no sign-up — install it and add your vehicles.
 
 ## Features
 
-- **8 GPS providers, one fleet** — LiveTrace, SimplyTrack, HashTrace,
-  Aargee, Transight, Mercydatrack, Mercydatrack 4G and PauldeaTrack.
+- **9 GPS providers, one fleet** — LiveTrace, SimplyTrack, HashTrace,
+  Aargee, Transight, Mercydatrack, Mercydatrack 4G, PauldeaTrack and AVLView.
 - **Live map** — OpenStreetMap by default, or Google Maps with your own
   API key (entered in Settings). Switch between them anytime.
 - **Fleet list** — live / idle / offline status, search, and filters by
@@ -37,6 +37,7 @@ No account, no sign-up — install it and add your vehicles.
 | Provider | Sign-in | Trip history |
 | --- | --- | --- |
 | Aargee GPS | API key | Yes |
+| AVLView | API key | Yes |
 | HashTrace | Auth key | No |
 | LiveTrace | User ID + key | No |
 | Mercydatrack | Username + password | Yes |
@@ -45,7 +46,7 @@ No account, no sign-up — install it and add your vehicles.
 | SimplyTrack | API key + user ID | Yes |
 | Transight GPS | API key | Yes |
 
-All eight providers are verified against their live APIs. Trip history
+All nine providers are verified against their live APIs. Trip history
 is shown where the provider supports it; the others show live location
 only.
 
