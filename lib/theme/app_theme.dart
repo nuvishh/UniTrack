@@ -77,6 +77,8 @@ class AppColors {
         return const Color(0xFF059669);
       case 'hashtrace':
         return const Color(0xFF0891B2);
+      case 'avlview':
+        return const Color(0xFF4F46E5);
       default:
         return unknown;
     }

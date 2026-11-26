@@ -19,9 +19,9 @@ never breaks when offline.
 
 ## Rules (enforced in code)
 
-1. **Built-ins are the source of truth.** The 8 shipped providers
+1. **Built-ins are the source of truth.** The 9 shipped providers
    (LiveTrace, SimplyTrack, HashTrace, Aargee, Mercydatrack,
-   Mercydatrack (4G), PauldeaTrack, Transight) are served by their
+   Mercydatrack (4G), PauldeaTrack, Transight, AVLView) are served by their
    built-in Dart clients.
    A registry entry can override a built-in's `baseUrl`/endpoints
    **only** when it is marked `"genericCompatible": true` **and**
@@ -30,7 +30,7 @@ never breaks when offline.
    `http://`, so a LiveTrace entry can never override the built-in —
    that is deliberate, because the generic client only serves HTTPS.)
 2. **A registry entry can ADD a new provider** (a key that is not one
-   of the 8 built-ins). It is served by the generic client
+   of the 9 built-ins). It is served by the generic client
    (`RemoteProviderClient`) and shown in the add-vehicle list with a
    **"Remote"** badge. New providers must use HTTPS.
 3. **Credentials only ever go to the baseUrl of the provider the user

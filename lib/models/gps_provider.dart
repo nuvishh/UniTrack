@@ -18,8 +18,8 @@ enum AuthType {
 /// [verified] marks the providers whose API contract was tested live
 /// against the real API (2026-11-09 for LiveTrace, SimplyTrack,
 /// HashTrace and Aargee; 2026-11-11 for Mercydatrack, PauldeaTrack
-/// and Transight; 2026-11-12 for Mercydatrack 4G). All 8 providers
-/// are now live-verified.
+/// and Transight; 2026-11-12 for Mercydatrack 4G; 2026-11-26 for
+/// AVLView). All 9 providers are now live-verified.
 enum GpsProvider {
   transight(
     key: 'transight',
@@ -126,6 +126,20 @@ enum GpsProvider {
     verified: true,
     minPollInterval: Duration(seconds: 30),
     rateLimitNote: 'No rate limit documented — poll every 30–60s.',
+  ),
+  avlview(
+    key: 'avlview',
+    displayName: 'AVLView',
+    authType: AuthType.apiKey,
+    deviceIdLabel: 'Registration / IMEI',
+    deviceIdHint: 'Plate number e.g. KL 13 AD 8772, IMEI, or plate ID',
+    secretLabel: 'API Key',
+    secretHint: 'AVLView X-API-Key (sk_live_...)',
+    supportsHistory: true,
+    verified: true,
+    minPollInterval: Duration(seconds: 60),
+    rateLimitNote:
+        '25,000 calls/day shared across all endpoints; history returns thousands of points per day.',
   );
 
   const GpsProvider({

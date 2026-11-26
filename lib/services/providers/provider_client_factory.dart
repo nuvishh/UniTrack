@@ -1,6 +1,7 @@
 import '../../models/gps_provider.dart';
 import '../../models/provider_registry.dart';
 import 'aargee_client.dart';
+import 'avlview_client.dart';
 import 'gps_provider_client.dart';
 import 'hashtrace_client.dart';
 import 'livetrace_client.dart';
@@ -30,6 +31,8 @@ GpsProviderClient clientFor(GpsProvider provider) {
       return SimplyTrackClient();
     case GpsProvider.hashtrace:
       return HashTraceClient();
+    case GpsProvider.avlview:
+      return AvlViewClient();
   }
 }
 
@@ -44,7 +47,7 @@ GpsProviderClient clientForKey(String key) =>
 /// 1. A registry override for a built-in key — only when the entry is
 ///    marked `overrideBuiltin` + `genericCompatible` with an https
 ///    base URL. Anything else falls through.
-/// 2. The built-in client for the 7 shipped provider keys.
+/// 2. The built-in client for the 9 shipped provider keys.
 /// 3. The generic client for a registry-added provider (https only).
 ///
 /// Throws [ProviderException] for an unknown key with no usable

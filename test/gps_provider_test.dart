@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:unitrack/models/gps_provider.dart';
 import 'package:unitrack/services/providers/aargee_client.dart';
+import 'package:unitrack/services/providers/avlview_client.dart';
 import 'package:unitrack/services/providers/hashtrace_client.dart';
 import 'package:unitrack/services/providers/livetrace_client.dart';
 import 'package:unitrack/services/providers/mercydatrack_client.dart';
@@ -11,7 +12,7 @@ import 'package:unitrack/services/providers/transight_client.dart';
 
 void main() {
   group('GpsProvider', () {
-    test('all 8 provider keys resolve', () {
+    test('all 9 provider keys resolve', () {
       const keys = [
         'transight',
         'aargee',
@@ -21,8 +22,9 @@ void main() {
         'pauldeatrack',
         'voltysoft',
         'hashtrace',
+        'avlview',
       ];
-      expect(GpsProvider.values, hasLength(8));
+      expect(GpsProvider.values, hasLength(9));
       for (final key in keys) {
         expect(GpsProvider.fromKey(key).key, key);
       }
@@ -67,7 +69,9 @@ void main() {
     test('verified flags match the live checks', () {
       // Verified live 2026-11-09: LiveTrace, SimplyTrack, HashTrace,
       // Aargee. Verified live 2026-11-11: Mercydatrack, PauldeaTrack,
-      // Transight. All 7 providers are now live-verified.
+      // Transight. Verified live 2026-11-12: Mercydatrack 4G.
+      // Verified live 2026-11-26: AVLView. All 9 providers are now
+      // live-verified.
       expect(GpsProvider.radiant.verified, isTrue);
       expect(GpsProvider.voltysoft.verified, isTrue);
       expect(GpsProvider.hashtrace.verified, isTrue);
@@ -75,6 +79,7 @@ void main() {
       expect(GpsProvider.mercydatrack.verified, isTrue);
       expect(GpsProvider.pauldeatrack.verified, isTrue);
       expect(GpsProvider.transight.verified, isTrue);
+      expect(GpsProvider.avlview.verified, isTrue);
     });
   });
 
@@ -87,6 +92,7 @@ void main() {
       expect(clientForKey('pauldeatrack'), isA<PauldeaTrackClient>());
       expect(clientForKey('voltysoft'), isA<SimplyTrackClient>());
       expect(clientForKey('hashtrace'), isA<HashTraceClient>());
+      expect(clientForKey('avlview'), isA<AvlViewClient>());
     });
   });
 }
