@@ -52,9 +52,12 @@ jobs:
         with:
           name: unitrack-release-apk
 
+      - name: Rename APK
+        run: mv app-release.apk "UniTrack.${{ github.ref_name }}.apk"
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.event.repository.name }} ${{ github.ref_name }}
-          files: app-release.apk
+          files: UniTrack.${{ github.ref_name }}.apk
           generate_release_notes: true
